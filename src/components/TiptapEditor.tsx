@@ -338,7 +338,7 @@ export function TiptapEditor() {
 
       {/* Editor */}
       <main className="flex-1">
-        <article className="w-full max-w-2xl mx-auto px-5 sm:px-8 pt-12 sm:pt-16 pb-24">
+        <article className="w-full px-4 sm:px-6 pt-6 sm:pt-8 pb-24">
           <EditorContent editor={editor} />
         </article>
       </main>

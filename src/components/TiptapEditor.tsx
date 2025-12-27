@@ -5,9 +5,13 @@ import Typography from '@tiptap/extension-typography';
 import CharacterCount from '@tiptap/extension-character-count';
 import Image from '@tiptap/extension-image';
 import Dropcursor from '@tiptap/extension-dropcursor';
-import { ListFilter, ImagePlus } from 'lucide-react';
+import Link from '@tiptap/extension-link';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import { ListFilter, ImagePlus, HelpCircle } from 'lucide-react';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { NotesPanel } from './NotesPanel';
+import { HelpPanel } from './HelpPanel';
 import { Note, loadNotes, saveNotes, createNote, getNoteTitleFromContent } from '@/lib/notes';
 
 // Compress image
@@ -46,6 +50,7 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number) {
 
 export function TiptapEditor() {
   const [showPanel, setShowPanel] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,7 +62,6 @@ export function TiptapEditor() {
   useEffect(() => {
     const loadedNotes = loadNotes();
     if (loadedNotes.length === 0) {
-      // Create first note
       const firstNote = createNote();
       setNotes([firstNote]);
       setActiveNoteId(firstNote.id);
@@ -103,12 +107,10 @@ export function TiptapEditor() {
       const updated = prev.filter(n => n.id !== id);
       saveNotes(updated);
       
-      // If deleting active note, switch to another
       if (id === activeNoteId) {
         if (updated.length > 0) {
           setActiveNoteId(updated[0].id);
         } else {
-          // Create new note if all deleted
           const newNote = createNote();
           const withNew = [newNote];
           saveNotes(withNew);
@@ -126,9 +128,10 @@ export function TiptapEditor() {
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
         dropcursor: false,
+        codeBlock: false,
       }),
       Placeholder.configure({
-        placeholder: '',
+        placeholder: 'Start typing... (Press ? for help)',
         emptyEditorClass: 'is-editor-empty',
       }),
       Typography,
@@ -141,6 +144,15 @@ export function TiptapEditor() {
       Dropcursor.configure({
         color: '#ffffff',
         width: 1,
+      }),
+      Link.configure({
+        openOnClick: true,
+        autolink: true,
+        linkOnPaste: true,
+      }),
+      TaskList,
+      TaskItem.configure({
+        nested: true,
       }),
     ],
     content: '',
@@ -276,12 +288,12 @@ export function TiptapEditor() {
   }, [activeNote?.content]);
 
   if (isLoading) {
-    return <div className="min-h-svh bg-background" />;
+    return <div className="min-h-svh bg-black" />;
   }
 
   return (
     <div 
-      className="min-h-svh bg-background flex flex-col relative"
+      className="min-h-svh bg-black flex flex-col relative"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -289,10 +301,10 @@ export function TiptapEditor() {
     >
       {/* Drag overlay */}
       {isDragging && (
-        <div className="fixed inset-0 z-40 bg-background/95 flex items-center justify-center pointer-events-none">
-          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+        <div className="fixed inset-0 z-40 bg-black/95 flex items-center justify-center pointer-events-none">
+          <div className="flex flex-col items-center gap-2 text-neutral-500">
             <ImagePlus className="w-8 h-8" strokeWidth={1.5} />
-            <span className="text-sm">Drop image</span>
+            <span className="text-sm font-mono">Drop image</span>
           </div>
         </div>
       )}
@@ -307,6 +319,11 @@ export function TiptapEditor() {
           onDeleteNote={handleDeleteNote}
           onClose={() => setShowPanel(false)}
         />
+      )}
+
+      {/* Help panel */}
+      {showHelp && (
+        <HelpPanel onClose={() => setShowHelp(false)} />
       )}
 
       {/* Hidden file input */}
@@ -326,11 +343,18 @@ export function TiptapEditor() {
         </article>
       </main>
 
-      {/* Bottom menu button */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10">
+      {/* Bottom buttons */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4">
+        <button
+          onClick={() => setShowHelp(true)}
+          className="p-2 text-neutral-600 hover:text-neutral-300 transition-colors duration-200"
+          aria-label="Help"
+        >
+          <HelpCircle className="w-4 h-4" strokeWidth={1.5} />
+        </button>
         <button
           onClick={() => setShowPanel(true)}
-          className="p-2 text-muted-foreground/40 hover:text-foreground transition-colors duration-200"
+          className="p-2 text-neutral-600 hover:text-neutral-300 transition-colors duration-200"
           aria-label="Open notes"
         >
           <ListFilter className="w-4 h-4" strokeWidth={1.5} />

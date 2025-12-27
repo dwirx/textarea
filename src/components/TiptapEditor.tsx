@@ -53,6 +53,33 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number) {
   };
 }
 
+// Get markdown prefix for element type
+function getMarkdownPrefix(tagName: string): string {
+  switch (tagName) {
+    case 'h1': return '# ';
+    case 'h2': return '## ';
+    case 'h3': return '### ';
+    case 'strong':
+    case 'b': return '**';
+    case 'em':
+    case 'i': return '*';
+    case 'code': return '`';
+    case 'li': return '- ';
+    default: return '';
+  }
+}
+
+function getMarkdownSuffix(tagName: string): string {
+  switch (tagName) {
+    case 'strong':
+    case 'b': return '**';
+    case 'em':
+    case 'i': return '*';
+    case 'code': return '`';
+    default: return '';
+  }
+}
+
 export function TiptapEditor() {
   const [showPanel, setShowPanel] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -62,8 +89,16 @@ export function TiptapEditor() {
   const [selectedFont, setSelectedFont] = useState(() => {
     return localStorage.getItem('textarea-font') || 'mono';
   });
+  const [editingElement, setEditingElement] = useState<{
+    element: HTMLElement;
+    tagName: string;
+    originalText: string;
+    rect: DOMRect;
+  } | null>(null);
+  const [editValue, setEditValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCountRef = useRef(0);
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   // Save font preference
   const handleSelectFont = useCallback((fontId: string) => {
@@ -300,6 +335,83 @@ export function TiptapEditor() {
     }
   }, [activeNote?.content]);
 
+  // Handle click on element to show markdown editor
+  const handleElementClick = useCallback((e: React.MouseEvent) => {
+    if (editingElement) return;
+    
+    const target = e.target as HTMLElement;
+    const tagName = target.tagName.toLowerCase();
+    
+    if (['h1', 'h2', 'h3', 'strong', 'em', 'code', 'li', 'b', 'i'].includes(tagName)) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const text = target.textContent || '';
+      const prefix = getMarkdownPrefix(tagName);
+      const suffix = getMarkdownSuffix(tagName);
+      const markdown = prefix + text + suffix;
+      
+      const rect = target.getBoundingClientRect();
+      target.style.opacity = '0';
+      
+      setEditingElement({
+        element: target,
+        tagName,
+        originalText: text,
+        rect
+      });
+      setEditValue(markdown);
+      
+      setTimeout(() => {
+        editInputRef.current?.focus();
+        editInputRef.current?.select();
+      }, 0);
+    }
+  }, [editingElement]);
+
+  // Apply the edit
+  const applyEdit = useCallback(() => {
+    if (!editingElement || !editor) return;
+    
+    const { element, tagName } = editingElement;
+    let newText = editValue;
+    
+    // Remove markdown syntax
+    newText = newText
+      .replace(/^#{1,3}\s*/, '')
+      .replace(/^\*\*|\*\*$/g, '')
+      .replace(/^\*|\*$/g, '')
+      .replace(/^`|`$/g, '')
+      .replace(/^-\s*/, '');
+    
+    if (element && element.isConnected) {
+      element.style.opacity = '1';
+      element.textContent = newText;
+      
+      if (activeNoteId) {
+        const html = editor.getHTML();
+        updateNote(activeNoteId, html);
+      }
+    }
+    
+    setEditingElement(null);
+    setEditValue('');
+  }, [editingElement, editValue, editor, activeNoteId, updateNote]);
+
+  // Handle keyboard in edit
+  const handleEditKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyEdit();
+    } else if (e.key === 'Escape') {
+      if (editingElement?.element) {
+        editingElement.element.style.opacity = '1';
+      }
+      setEditingElement(null);
+      setEditValue('');
+    }
+  }, [applyEdit, editingElement]);
+
   if (isLoading) {
     return <div className="min-h-svh bg-black" />;
   }
@@ -346,11 +458,37 @@ export function TiptapEditor() {
         className="hidden"
       />
 
+      {/* Inline markdown editor overlay */}
+      {editingElement && (
+        <input
+          ref={editInputRef}
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleEditKeyDown}
+          onBlur={applyEdit}
+          className="fixed z-50 bg-transparent text-neutral-100 font-mono focus:outline-none"
+          style={{
+            left: editingElement.rect.left - 4,
+            top: editingElement.rect.top,
+            fontSize: editingElement.tagName === 'h1' ? '2rem' : 
+                     editingElement.tagName === 'h2' ? '1.5rem' : 
+                     editingElement.tagName === 'h3' ? '1.25rem' : '1rem',
+            fontWeight: ['h1', 'h2', 'h3', 'strong', 'b'].includes(editingElement.tagName) ? 'bold' : 'normal',
+            fontStyle: ['em', 'i'].includes(editingElement.tagName) ? 'italic' : 'normal',
+            minWidth: Math.max(editingElement.rect.width + 50, 200),
+            height: editingElement.rect.height,
+            lineHeight: `${editingElement.rect.height}px`,
+          }}
+        />
+      )}
+
       {/* Editor */}
       <main className="flex-1">
         <article 
           className="w-full px-4 sm:px-6 pt-6 sm:pt-8 pb-24"
           style={{ fontFamily: FONTS[selectedFont] }}
+          onClick={handleElementClick}
         >
           <EditorContent editor={editor} />
         </article>

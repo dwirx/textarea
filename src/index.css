@@ -50,42 +50,42 @@
   }
 
   .dark {
-    --background: 30 10% 8%;
-    --foreground: 40 15% 92%;
+    --background: 25 12% 7%;
+    --foreground: 40 12% 90%;
 
-    --card: 30 10% 10%;
-    --card-foreground: 40 15% 92%;
+    --card: 25 12% 9%;
+    --card-foreground: 40 12% 90%;
 
-    --popover: 30 10% 8%;
-    --popover-foreground: 40 15% 92%;
+    --popover: 25 12% 7%;
+    --popover-foreground: 40 12% 90%;
 
-    --primary: 35 70% 55%;
-    --primary-foreground: 30 10% 8%;
+    --primary: 35 65% 55%;
+    --primary-foreground: 25 12% 7%;
 
-    --secondary: 30 8% 15%;
-    --secondary-foreground: 40 15% 85%;
+    --secondary: 25 10% 14%;
+    --secondary-foreground: 40 12% 85%;
 
-    --muted: 30 8% 18%;
-    --muted-foreground: 40 10% 55%;
+    --muted: 25 10% 16%;
+    --muted-foreground: 40 8% 50%;
 
-    --accent: 35 60% 55%;
-    --accent-foreground: 30 10% 8%;
+    --accent: 35 55% 55%;
+    --accent-foreground: 25 12% 7%;
 
     --destructive: 0 62% 50%;
-    --destructive-foreground: 40 15% 92%;
+    --destructive-foreground: 40 12% 90%;
 
-    --border: 30 8% 18%;
-    --input: 30 8% 18%;
-    --ring: 35 70% 55%;
+    --border: 25 10% 16%;
+    --input: 25 10% 16%;
+    --ring: 35 65% 55%;
 
-    --sidebar-background: 30 10% 10%;
-    --sidebar-foreground: 40 15% 85%;
-    --sidebar-primary: 35 70% 55%;
-    --sidebar-primary-foreground: 30 10% 8%;
-    --sidebar-accent: 30 8% 15%;
-    --sidebar-accent-foreground: 40 15% 85%;
-    --sidebar-border: 30 8% 18%;
-    --sidebar-ring: 35 70% 55%;
+    --sidebar-background: 25 12% 9%;
+    --sidebar-foreground: 40 12% 85%;
+    --sidebar-primary: 35 65% 55%;
+    --sidebar-primary-foreground: 25 12% 7%;
+    --sidebar-accent: 25 10% 14%;
+    --sidebar-accent-foreground: 40 12% 85%;
+    --sidebar-border: 25 10% 16%;
+    --sidebar-ring: 35 65% 55%;
   }
 }
 
@@ -94,22 +94,28 @@
     @apply border-border;
   }
 
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "liga" 1, "calt" 1;
     text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
   }
 
   ::selection {
-    @apply bg-primary/20;
+    @apply bg-primary/15;
   }
 }
 
 @layer utilities {
   .editor-content {
     font-family: var(--font-serif);
-    font-size: 1.125rem;
-    line-height: 1.9;
+    font-size: 1rem;
+    line-height: 1.85;
     tab-size: 4;
     white-space: pre-wrap;
     overflow-wrap: break-word;
@@ -117,7 +123,14 @@
     letter-spacing: 0.01em;
   }
 
-  @media (min-width: 640px) {
+  @media (min-width: 480px) {
+    .editor-content {
+      font-size: 1.125rem;
+      line-height: 1.9;
+    }
+  }
+
+  @media (min-width: 768px) {
     .editor-content {
       font-size: 1.25rem;
     }
@@ -128,37 +141,8 @@
   }
 
   .editor-content:empty::before {
-    content: "Write something...";
-    color: hsl(var(--muted-foreground) / 0.5);
+    content: "Write...";
+    color: hsl(var(--muted-foreground) / 0.4);
     font-style: italic;
-  }
-
-  .fade-in {
-    animation: fadeIn 0.4s ease-out;
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .slide-up {
-    animation: slideUp 0.2s ease-out;
-  }
-
-  @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
   }
 }

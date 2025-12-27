@@ -342,25 +342,21 @@ export function TiptapEditor() {
     const tagName = target.tagName.toLowerCase();
     
     // Check if hovering over heading, strong, em, code, li
-    if (['h1', 'h2', 'h3', 'strong', 'em', 'code', 'li', 'b', 'i'].includes(tagName)) {
+    if (['h1', 'h2', 'h3', 'strong', 'em', 'code', 'li', 'b', 'i', 'p'].includes(tagName)) {
       const outerHTML = target.outerHTML;
       const markdown = htmlToMarkdownPreview(outerHTML);
       
-      if (markdown) {
+      if (markdown && markdown.length > 0) {
         const rect = target.getBoundingClientRect();
         setHoveredElement({ text: target.textContent || '', markdown });
-        setTooltipPos({ x: rect.left, y: rect.top - 8 });
+        // Position below the element
+        setTooltipPos({ x: rect.left, y: rect.bottom + 6 });
       }
     }
   }, []);
 
-  const handleEditorMouseOut = useCallback((e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    const tagName = target.tagName.toLowerCase();
-    
-    if (['h1', 'h2', 'h3', 'strong', 'em', 'code', 'li', 'b', 'i'].includes(tagName)) {
-      setHoveredElement(null);
-    }
+  const handleEditorMouseOut = useCallback(() => {
+    setHoveredElement(null);
   }, []);
 
   if (isLoading) {
@@ -409,17 +405,17 @@ export function TiptapEditor() {
         className="hidden"
       />
 
-      {/* Markdown source tooltip */}
+      {/* Markdown source tooltip - appears below element */}
       {hoveredElement && (
         <div 
-          className="fixed z-50 px-3 py-1.5 bg-neutral-800 border border-neutral-700 rounded-md text-xs font-mono text-emerald-400 shadow-lg pointer-events-none transform -translate-y-full"
+          className="fixed z-50 px-3 py-2 bg-neutral-900/95 backdrop-blur-sm border border-neutral-700 rounded-lg text-sm font-mono text-emerald-400 shadow-xl pointer-events-none animate-in fade-in duration-150"
           style={{ 
             left: tooltipPos.x, 
             top: tooltipPos.y,
-            maxWidth: '300px'
+            maxWidth: '400px'
           }}
         >
-          {hoveredElement.markdown}
+          <code>{hoveredElement.markdown}</code>
         </div>
       )}
 

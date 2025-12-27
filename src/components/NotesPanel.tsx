@@ -1,16 +1,19 @@
 import { Note, getNoteTitleFromContent } from '@/lib/notes';
-import { X, User, HelpCircle, ChevronDown, Download, Keyboard } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { X, User, ChevronDown, Download, Keyboard, Upload, Sun, Moon } from 'lucide-react';
+import { useState, useMemo, useRef } from 'react';
 
 interface NotesPanelProps {
   notes: Note[];
   activeNoteId: string | null;
   selectedFont: string;
+  theme: 'dark' | 'light';
   onSelectNote: (id: string) => void;
   onCreateNote: () => void;
   onDeleteNote: (id: string) => void;
   onSelectFont: (font: string) => void;
   onExportMarkdown: () => void;
+  onImportMarkdown: (content: string, filename: string) => void;
+  onToggleTheme: () => void;
   onClose: () => void;
 }
 
@@ -112,16 +115,33 @@ export function NotesPanel({
   notes,
   activeNoteId,
   selectedFont,
+  theme,
   onSelectNote,
   onCreateNote,
   onDeleteNote,
   onSelectFont,
   onExportMarkdown,
+  onImportMarkdown,
+  onToggleTheme,
   onClose,
 }: NotesPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [showFontMenu, setShowFontMenu] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const text = await file.text();
+    onImportMarkdown(text, file.name);
+    
+    if (importInputRef.current) {
+      importInputRef.current.value = '';
+    }
+    onClose();
+  };
 
   const filteredNotes = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -142,24 +162,28 @@ export function NotesPanel({
 
   if (showHelp) {
     return (
-      <div className="fixed inset-0 z-50 bg-black overflow-y-auto">
+      <div className={`fixed inset-0 z-50 overflow-y-auto ${theme === 'dark' ? 'bg-black' : 'bg-white'}`}>
         <button
           onClick={() => setShowHelp(false)}
-          className="absolute top-4 right-4 p-1.5 text-neutral-500 hover:text-neutral-300 transition-colors"
+          className={`absolute top-4 right-4 p-1.5 transition-colors ${
+            theme === 'dark' ? 'text-neutral-500 hover:text-neutral-300' : 'text-neutral-400 hover:text-neutral-600'
+          }`}
         >
           <X className="w-5 h-5" strokeWidth={1.5} />
         </button>
 
         <div className="max-w-2xl mx-auto px-6 pt-12 pb-24">
-          <h1 className="text-lg font-mono text-neutral-200 mb-6">Markdown Shortcuts</h1>
+          <h1 className={`text-lg font-mono mb-6 ${theme === 'dark' ? 'text-neutral-200' : 'text-neutral-800'}`}>
+            Keyboard Shortcuts
+          </h1>
           
           <div className="space-y-6 text-sm font-mono">
             <div>
-              <div className="text-neutral-500 mb-2">HEADINGS</div>
-              <div className="space-y-1 text-neutral-400">
-                <div><code className="text-neutral-300"># </code> Heading 1</div>
-                <div><code className="text-neutral-300">## </code> Heading 2</div>
-                <div><code className="text-neutral-300">### </code> Heading 3</div>
+              <div className={theme === 'dark' ? 'text-neutral-500 mb-2' : 'text-neutral-400 mb-2'}>HEADINGS</div>
+              <div className={theme === 'dark' ? 'space-y-1 text-neutral-400' : 'space-y-1 text-neutral-500'}>
+                <div><code className={theme === 'dark' ? 'text-neutral-300' : 'text-neutral-700'}># </code> Heading 1</div>
+                <div><code className={theme === 'dark' ? 'text-neutral-300' : 'text-neutral-700'}>## </code> Heading 2</div>
+                <div><code className={theme === 'dark' ? 'text-neutral-300' : 'text-neutral-700'}>### </code> Heading 3</div>
               </div>
             </div>
 
@@ -212,11 +236,22 @@ export function NotesPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black">
+    <div className={`fixed inset-0 z-50 ${theme === 'dark' ? 'bg-black' : 'bg-white'}`}>
+      {/* Hidden import input */}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".md,.markdown,.txt"
+        onChange={handleImportFile}
+        className="hidden"
+      />
+
       {/* Close button */}
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 p-1.5 text-neutral-500 hover:text-neutral-300 transition-colors"
+        className={`absolute top-4 right-4 p-1.5 transition-colors ${
+          theme === 'dark' ? 'text-neutral-500 hover:text-neutral-300' : 'text-neutral-400 hover:text-neutral-600'
+        }`}
       >
         <X className="w-5 h-5" strokeWidth={1.5} />
       </button>
@@ -230,7 +265,11 @@ export function NotesPanel({
             placeholder="Search notes"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-4 py-3 text-sm font-mono text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-neutral-700"
+            className={`w-full border rounded-md px-4 py-3 text-sm font-mono focus:outline-none ${
+              theme === 'dark' 
+                ? 'bg-neutral-900 border-neutral-800 text-neutral-200 placeholder:text-neutral-600 focus:border-neutral-700'
+                : 'bg-neutral-50 border-neutral-200 text-neutral-800 placeholder:text-neutral-400 focus:border-neutral-300'
+            }`}
             autoFocus
           />
         </div>
@@ -238,7 +277,7 @@ export function NotesPanel({
         {/* Notes list */}
         <div className="space-y-4 mb-8">
           {filteredNotes.length === 0 ? (
-            <div className="text-neutral-600 text-sm font-mono py-4">
+            <div className={`text-sm font-mono py-4 ${theme === 'dark' ? 'text-neutral-600' : 'text-neutral-400'}`}>
               {searchQuery ? 'No notes found' : 'No notes yet'}
             </div>
           ) : (
@@ -255,19 +294,25 @@ export function NotesPanel({
                       }}
                       className="text-left"
                     >
-                      <span className="text-sm font-mono text-neutral-200 underline underline-offset-2 hover:text-neutral-400 transition-colors">
+                      <span className={`text-sm font-mono underline underline-offset-2 transition-colors ${
+                        theme === 'dark' ? 'text-neutral-200 hover:text-neutral-400' : 'text-neutral-700 hover:text-neutral-500'
+                      }`}>
                         {title}
                       </span>
                     </button>
                     
-                    <span className="text-xs font-mono text-neutral-600 whitespace-nowrap underline underline-offset-2">
+                    <span className={`text-xs font-mono whitespace-nowrap underline underline-offset-2 ${
+                      theme === 'dark' ? 'text-neutral-600' : 'text-neutral-400'
+                    }`}>
                       {formatFullDate(note.updatedAt)}
                     </span>
                   </div>
 
                   <button
                     onClick={() => onDeleteNote(note.id)}
-                    className="absolute -right-6 top-0 p-1 opacity-0 group-hover:opacity-100 text-neutral-600 hover:text-neutral-300 transition-all"
+                    className={`absolute -right-6 top-0 p-1 opacity-0 group-hover:opacity-100 transition-all ${
+                      theme === 'dark' ? 'text-neutral-600 hover:text-neutral-300' : 'text-neutral-400 hover:text-neutral-600'
+                    }`}
                   >
                     <X className="w-3 h-3" strokeWidth={1.5} />
                   </button>
@@ -283,28 +328,49 @@ export function NotesPanel({
             onCreateNote();
             onClose();
           }}
-          className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-md text-sm font-mono text-neutral-200 transition-colors"
+          className={`px-4 py-2 border rounded-md text-sm font-mono transition-colors ${
+            theme === 'dark'
+              ? 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-200'
+              : 'bg-neutral-100 hover:bg-neutral-200 border-neutral-200 text-neutral-700'
+          }`}
         >
           Create note
         </button>
 
         {/* Divider */}
-        <div className="border-t border-neutral-900 my-8" />
+        <div className={`border-t my-8 ${theme === 'dark' ? 'border-neutral-900' : 'border-neutral-200'}`} />
 
         {/* Settings */}
         <div className="space-y-4">
+          {/* Theme toggle */}
+          <button
+            onClick={onToggleTheme}
+            className={`flex items-center gap-2 text-sm font-mono transition-colors ${
+              theme === 'dark' ? 'text-neutral-500 hover:text-neutral-300' : 'text-neutral-500 hover:text-neutral-700'
+            }`}
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          </button>
+
           {/* Font selector */}
           <div className="relative">
             <button
               onClick={() => setShowFontMenu(!showFontMenu)}
-              className="flex items-center justify-between w-full max-w-xs px-4 py-2 bg-neutral-900 border border-neutral-800 rounded-md text-sm font-mono text-neutral-300 hover:bg-neutral-800 transition-colors"
+              className={`flex items-center justify-between w-full max-w-xs px-4 py-2 border rounded-md text-sm font-mono transition-colors ${
+                theme === 'dark'
+                  ? 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:bg-neutral-800'
+                  : 'bg-neutral-50 border-neutral-200 text-neutral-600 hover:bg-neutral-100'
+              }`}
             >
               <span>Font: {currentFontName}</span>
-              <ChevronDown className="w-4 h-4 text-neutral-500" />
+              <ChevronDown className={`w-4 h-4 ${theme === 'dark' ? 'text-neutral-500' : 'text-neutral-400'}`} />
             </button>
             
             {showFontMenu && (
-              <div className="absolute top-full left-0 mt-1 w-full max-w-xs bg-neutral-900 border border-neutral-800 rounded-md overflow-hidden z-10">
+              <div className={`absolute top-full left-0 mt-1 w-full max-w-xs border rounded-md overflow-hidden z-10 ${
+                theme === 'dark' ? 'bg-neutral-900 border-neutral-800' : 'bg-white border-neutral-200'
+              }`}>
                 {FONTS.map((font) => (
                   <button
                     key={font.id}
@@ -314,8 +380,8 @@ export function NotesPanel({
                     }}
                     className={`w-full px-4 py-2 text-left text-sm font-mono transition-colors ${
                       selectedFont === font.id 
-                        ? 'bg-neutral-800 text-neutral-200' 
-                        : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'
+                        ? theme === 'dark' ? 'bg-neutral-800 text-neutral-200' : 'bg-neutral-100 text-neutral-800'
+                        : theme === 'dark' ? 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200' : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-800'
                     }`}
                     style={{ fontFamily: font.family }}
                   >
@@ -326,10 +392,23 @@ export function NotesPanel({
             )}
           </div>
 
+          {/* Import Markdown */}
+          <button
+            onClick={() => importInputRef.current?.click()}
+            className={`flex items-center gap-2 text-sm font-mono transition-colors ${
+              theme === 'dark' ? 'text-neutral-500 hover:text-neutral-300' : 'text-neutral-500 hover:text-neutral-700'
+            }`}
+          >
+            <Upload className="w-4 h-4" />
+            Import Markdown
+          </button>
+
           {/* Export Markdown */}
           <button
             onClick={onExportMarkdown}
-            className="flex items-center gap-2 text-sm font-mono text-neutral-500 hover:text-neutral-300 transition-colors"
+            className={`flex items-center gap-2 text-sm font-mono transition-colors ${
+              theme === 'dark' ? 'text-neutral-500 hover:text-neutral-300' : 'text-neutral-500 hover:text-neutral-700'
+            }`}
           >
             <Download className="w-4 h-4" />
             Export to Markdown
@@ -338,7 +417,9 @@ export function NotesPanel({
           {/* Help link */}
           <button
             onClick={() => setShowHelp(true)}
-            className="flex items-center gap-2 text-sm font-mono text-neutral-500 hover:text-neutral-300 transition-colors"
+            className={`flex items-center gap-2 text-sm font-mono transition-colors ${
+              theme === 'dark' ? 'text-neutral-500 hover:text-neutral-300' : 'text-neutral-500 hover:text-neutral-700'
+            }`}
           >
             <Keyboard className="w-4 h-4" />
             Keyboard shortcuts
@@ -347,7 +428,7 @@ export function NotesPanel({
 
         {/* Attribution */}
         <div className="mt-8">
-          <span className="text-xs font-mono text-neutral-700">
+          <span className={`text-xs font-mono ${theme === 'dark' ? 'text-neutral-700' : 'text-neutral-400'}`}>
             Created by <span className="underline underline-offset-2">nobody</span>
           </span>
         </div>
@@ -355,7 +436,9 @@ export function NotesPanel({
 
       {/* User avatar */}
       <div className="fixed right-6 top-1/2 -translate-y-1/2">
-        <div className="w-10 h-10 rounded-full border border-neutral-800 flex items-center justify-center text-neutral-700">
+        <div className={`w-10 h-10 rounded-full border flex items-center justify-center ${
+          theme === 'dark' ? 'border-neutral-800 text-neutral-700' : 'border-neutral-200 text-neutral-400'
+        }`}>
           <User className="w-5 h-5" strokeWidth={1.5} />
         </div>
       </div>

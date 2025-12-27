@@ -12,6 +12,28 @@ import { Menu, ImagePlus } from 'lucide-react';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { NotesPanel } from './NotesPanel';
 import { Note, loadNotes, saveNotes, createNote, getNoteTitleFromContent } from '@/lib/notes';
+import { marked } from 'marked';
+
+// Convert markdown to HTML
+function markdownToHtml(markdown: string): string {
+  return marked.parse(markdown, { async: false }) as string;
+}
+
+// Check if text looks like markdown
+function looksLikeMarkdown(text: string): boolean {
+  const mdPatterns = [
+    /^#{1,6}\s/m,           // Headings
+    /^\s*[-*+]\s/m,         // Unordered lists
+    /^\s*\d+\.\s/m,         // Ordered lists
+    /\*\*[^*]+\*\*/,        // Bold
+    /\*[^*]+\*/,            // Italic
+    /`[^`]+`/,              // Inline code
+    /```[\s\S]*```/,        // Code blocks
+    /^\s*>/m,               // Blockquotes
+    /\[.+\]\(.+\)/,         // Links
+  ];
+  return mdPatterns.some(pattern => pattern.test(text));
+}
 
 const FONTS: Record<string, string> = {
   mono: "'IBM Plex Mono', monospace",
@@ -64,6 +86,7 @@ export function TiptapEditor() {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCountRef = useRef(0);
+  const editorRef = useRef<any>(null);
 
   // Save font preference
   const handleSelectFont = useCallback((fontId: string) => {
@@ -196,9 +219,11 @@ export function TiptapEditor() {
         }
         return false;
       },
-      handlePaste: (view, event) => {
+      handlePaste: (view, event, slice) => {
         const items = Array.from(event.clipboardData?.items ?? []);
         const images = items.filter(item => item.type.startsWith('image/'));
+        
+        // Handle image paste
         if (images.length > 0) {
           event.preventDefault();
           images.forEach(async (item) => {
@@ -217,6 +242,22 @@ export function TiptapEditor() {
           });
           return true;
         }
+        
+        // Handle markdown paste
+        const text = event.clipboardData?.getData('text/plain');
+        if (text && looksLikeMarkdown(text)) {
+          event.preventDefault();
+          const html = markdownToHtml(text);
+          
+          // Use editorRef to insert content
+          if (editorRef.current) {
+            editorRef.current.commands.insertContent(html);
+            return true;
+          }
+          
+          return false;
+        }
+        
         return false;
       },
     },
@@ -226,6 +267,13 @@ export function TiptapEditor() {
       }
     },
   }, [activeNoteId]);
+
+  // Set editorRef when editor is ready
+  useEffect(() => {
+    if (editor) {
+      editorRef.current = editor;
+    }
+  }, [editor]);
 
   // Set editor content when active note changes
   useEffect(() => {

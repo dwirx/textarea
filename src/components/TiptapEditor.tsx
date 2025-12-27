@@ -7,46 +7,8 @@ import Image from '@tiptap/extension-image';
 import Dropcursor from '@tiptap/extension-dropcursor';
 import { ListFilter, ImagePlus } from 'lucide-react';
 import { useEffect, useState, useCallback, useRef } from 'react';
-
-// Compression utilities
-async function compress(string: string): Promise<string> {
-  const byteArray = new TextEncoder().encode(string);
-  const stream = new CompressionStream('deflate-raw');
-  const writer = stream.writable.getWriter();
-  writer.write(byteArray);
-  writer.close();
-  const buffer = await new Response(stream.readable).arrayBuffer();
-  const uint8Array = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < uint8Array.length; i++) {
-    binary += String.fromCharCode(uint8Array[i]);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-}
-
-async function decompress(b64: string): Promise<string> {
-  const base64 = b64.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
-  const binary = atob(padded);
-  const byteArray = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    byteArray[i] = binary.charCodeAt(i);
-  }
-  const stream = new DecompressionStream('deflate-raw');
-  const writer = stream.writable.getWriter();
-  writer.write(byteArray);
-  writer.close();
-  const buffer = await new Response(stream.readable).arrayBuffer();
-  return new TextDecoder().decode(buffer);
-}
-
-function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number) {
-  let timer: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), ms);
-  };
-}
+import { NotesPanel } from './NotesPanel';
+import { Note, loadNotes, saveNotes, createNote, getNoteTitleFromContent } from '@/lib/notes';
 
 // Compress image
 async function compressImage(file: File, maxWidth = 1200, quality = 0.8): Promise<string> {
@@ -74,53 +36,90 @@ async function compressImage(file: File, maxWidth = 1200, quality = 0.8): Promis
   });
 }
 
+function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number) {
+  let timer: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
 export function TiptapEditor() {
-  const [showMenu, setShowMenu] = useState(false);
-  const [initialContent, setInitialContent] = useState<string | null>(null);
+  const [showPanel, setShowPanel] = useState(false);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCountRef = useRef(0);
 
-  // Load content
+  // Load notes on mount
   useEffect(() => {
-    const loadContent = async () => {
-      try {
-        let hash = window.location.hash;
-        if (!hash) {
-          hash = localStorage.getItem('textarea-hash') ?? '';
-        }
-        if (hash && hash.startsWith('#')) {
-          const decoded = await decompress(hash.slice(1));
-          setInitialContent(decoded);
-        } else {
-          setInitialContent('');
-        }
-      } catch (e) {
-        console.error('Failed to load content:', e);
-        setInitialContent('');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadContent();
-  }, []);
-
-  const saveToUrl = useCallback(async (html: string) => {
-    if (!html || html === '<p></p>') {
-      window.history.replaceState({}, '', window.location.pathname);
-      try { localStorage.removeItem('textarea-hash'); } catch (e) { /* ignore */ }
-      return;
+    const loadedNotes = loadNotes();
+    if (loadedNotes.length === 0) {
+      // Create first note
+      const firstNote = createNote();
+      setNotes([firstNote]);
+      setActiveNoteId(firstNote.id);
+      saveNotes([firstNote]);
+    } else {
+      setNotes(loadedNotes);
+      setActiveNoteId(loadedNotes[0].id);
     }
-    const hash = '#' + await compress(html);
-    window.history.replaceState({}, '', hash);
-    try { localStorage.setItem('textarea-hash', hash); } catch (e) { /* ignore */ }
+    setIsLoading(false);
   }, []);
 
-  const debouncedSave = useCallback(
-    debounce((html: string) => saveToUrl(html), 500),
-    [saveToUrl]
+  const activeNote = notes.find(n => n.id === activeNoteId);
+
+  const updateNote = useCallback((id: string, content: string) => {
+    setNotes(prev => {
+      const updated = prev.map(note => 
+        note.id === id 
+          ? { ...note, content, updatedAt: Date.now() }
+          : note
+      );
+      saveNotes(updated);
+      return updated;
+    });
+  }, []);
+
+  const debouncedUpdateNote = useCallback(
+    debounce((id: string, content: string) => updateNote(id, content), 300),
+    [updateNote]
   );
+
+  const handleCreateNote = useCallback(() => {
+    const newNote = createNote();
+    setNotes(prev => {
+      const updated = [newNote, ...prev];
+      saveNotes(updated);
+      return updated;
+    });
+    setActiveNoteId(newNote.id);
+  }, []);
+
+  const handleDeleteNote = useCallback((id: string) => {
+    setNotes(prev => {
+      const updated = prev.filter(n => n.id !== id);
+      saveNotes(updated);
+      
+      // If deleting active note, switch to another
+      if (id === activeNoteId) {
+        if (updated.length > 0) {
+          setActiveNoteId(updated[0].id);
+        } else {
+          // Create new note if all deleted
+          const newNote = createNote();
+          const withNew = [newNote];
+          saveNotes(withNew);
+          setActiveNoteId(newNote.id);
+          return withNew;
+        }
+      }
+      
+      return updated;
+    });
+  }, [activeNoteId]);
 
   const editor = useEditor({
     extensions: [
@@ -197,17 +196,21 @@ export function TiptapEditor() {
       },
     },
     onUpdate: ({ editor }) => {
-      const html = editor.getHTML();
-      debouncedSave(html);
+      if (activeNoteId) {
+        debouncedUpdateNote(activeNoteId, editor.getHTML());
+      }
     },
-  }, [initialContent]);
+  }, [activeNoteId]);
 
-  // Set initial content
+  // Set editor content when active note changes
   useEffect(() => {
-    if (editor && initialContent !== null && initialContent !== '') {
-      editor.commands.setContent(initialContent);
+    if (editor && activeNote) {
+      const currentContent = editor.getHTML();
+      if (currentContent !== activeNote.content) {
+        editor.commands.setContent(activeNote.content);
+      }
     }
-  }, [editor, initialContent]);
+  }, [editor, activeNote?.id]);
 
   // Handle file input
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -264,65 +267,15 @@ export function TiptapEditor() {
     }
   };
 
-  // Keyboard shortcut
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault();
-        downloadAsHtml();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editor]);
-
   // Update title
   useEffect(() => {
-    if (editor) {
-      const text = editor.getText();
-      const match = text.match(/^(.+)/);
-      document.title = match?.[1]?.trim().slice(0, 50) || 'Textarea';
+    if (activeNote) {
+      const title = getNoteTitleFromContent(activeNote.content);
+      document.title = title || 'Textarea';
     }
-  }, [editor?.storage.characterCount]);
+  }, [activeNote?.content]);
 
-  const downloadAsHtml = useCallback(() => {
-    if (!editor) return;
-    const text = editor.getText();
-    const title = text.split('\n')[0]?.trim().slice(0, 50) || 'Textarea';
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    html{background:#000;color:#f2f2f2}
-    article{max-width:680px;margin:0 auto;padding:48px 24px;font:17px/1.7 'IBM Plex Mono',monospace}
-    h1,h2,h3{margin:1.5em 0 .5em;font-weight:600}
-    h1{font-size:1.75em}h2{font-size:1.375em}h3{font-size:1.125em}
-    p{margin:.75em 0}strong{font-weight:600}em{font-style:italic}
-    code{font-family:inherit;background:#1a1a1a;padding:.15em .35em;border-radius:3px}
-    blockquote{border-left:2px solid #333;padding-left:1em;margin:1em 0;font-style:italic;color:#888}
-    ul,ol{margin:.75em 0;padding-left:1.25em}
-    img{max-width:100%;height:auto;border-radius:4px;margin:1em 0}
-  </style>
-</head>
-<body><article>${editor.getHTML()}</article></body>
-</html>`;
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${title}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [editor]);
-
-  const wordCount = editor?.storage.characterCount?.words() ?? 0;
-  const charCount = editor?.storage.characterCount?.characters() ?? 0;
-
-  if (isLoading || initialContent === null) {
+  if (isLoading) {
     return <div className="min-h-svh bg-background" />;
   }
 
@@ -336,12 +289,24 @@ export function TiptapEditor() {
     >
       {/* Drag overlay */}
       {isDragging && (
-        <div className="fixed inset-0 z-50 bg-background/95 flex items-center justify-center pointer-events-none">
+        <div className="fixed inset-0 z-40 bg-background/95 flex items-center justify-center pointer-events-none">
           <div className="flex flex-col items-center gap-2 text-muted-foreground">
             <ImagePlus className="w-8 h-8" strokeWidth={1.5} />
             <span className="text-sm">Drop image</span>
           </div>
         </div>
+      )}
+
+      {/* Notes panel */}
+      {showPanel && (
+        <NotesPanel
+          notes={notes}
+          activeNoteId={activeNoteId}
+          onSelectNote={setActiveNoteId}
+          onCreateNote={handleCreateNote}
+          onDeleteNote={handleDeleteNote}
+          onClose={() => setShowPanel(false)}
+        />
       )}
 
       {/* Hidden file input */}
@@ -364,52 +329,13 @@ export function TiptapEditor() {
       {/* Bottom menu button */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10">
         <button
-          onClick={() => setShowMenu(!showMenu)}
+          onClick={() => setShowPanel(true)}
           className="p-2 text-muted-foreground/40 hover:text-foreground transition-colors duration-200"
-          aria-label="Menu"
+          aria-label="Open notes"
         >
           <ListFilter className="w-4 h-4" strokeWidth={1.5} />
         </button>
       </div>
-
-      {/* Menu popup */}
-      {showMenu && (
-        <>
-          <div 
-            className="fixed inset-0 z-20" 
-            onClick={() => setShowMenu(false)} 
-          />
-          <div className="fixed bottom-14 left-1/2 -translate-x-1/2 z-30 bg-card border border-border rounded-lg shadow-lg p-3 min-w-[160px]">
-            <div className="text-xs text-muted-foreground font-mono mb-3 px-1">
-              {wordCount} words · {charCount} chars
-            </div>
-            <div className="space-y-1">
-              <button
-                onClick={() => {
-                  fileInputRef.current?.click();
-                  setShowMenu(false);
-                }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-foreground/80 hover:bg-accent rounded transition-colors"
-              >
-                <ImagePlus className="w-3.5 h-3.5" strokeWidth={1.5} />
-                Add image
-              </button>
-              <button
-                onClick={() => {
-                  downloadAsHtml();
-                  setShowMenu(false);
-                }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-foreground/80 hover:bg-accent rounded transition-colors"
-              >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                </svg>
-                Save HTML
-              </button>
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }

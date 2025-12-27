@@ -38,32 +38,32 @@ function looksLikeMarkdown(text: string): boolean {
 // Convert HTML to Markdown for export
 function htmlToMarkdown(html: string): string {
   let md = html;
-  
+
   // Headings
   md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n');
   md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n');
   md = md.replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n');
-  
+
   // Bold and italic
   md = md.replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**');
   md = md.replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**');
   md = md.replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*');
   md = md.replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*');
-  
+
   // Strikethrough
   md = md.replace(/<s[^>]*>(.*?)<\/s>/gi, '~~$1~~');
-  
+
   // Code
   md = md.replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`');
   md = md.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi, '```\n$1\n```\n\n');
-  
+
   // Links
   md = md.replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)');
-  
+
   // Images
   md = md.replace(/<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*\/?>/gi, '![$2]($1)');
   md = md.replace(/<img[^>]*src="([^"]*)"[^>]*\/?>/gi, '![]($1)');
-  
+
   // Lists
   md = md.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (_, content) => {
     return content.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '- $1\n') + '\n';
@@ -75,40 +75,42 @@ function htmlToMarkdown(html: string): string {
       return `${index}. \n`;
     }) + '\n';
   });
-  
+
   // Blockquotes
   md = md.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, content) => {
     return content.split('\n').map((line: string) => `> ${line}`).join('\n') + '\n\n';
   });
-  
+
   // Horizontal rule
   md = md.replace(/<hr[^>]*\/?>/gi, '\n---\n\n');
-  
+
   // Paragraphs and line breaks
   md = md.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '$1\n\n');
   md = md.replace(/<br[^>]*\/?>/gi, '\n');
-  
+
   // Clean up remaining tags
   md = md.replace(/<[^>]+>/g, '');
-  
+
   // Decode HTML entities
   md = md.replace(/&nbsp;/g, ' ');
   md = md.replace(/&amp;/g, '&');
   md = md.replace(/&lt;/g, '<');
   md = md.replace(/&gt;/g, '>');
   md = md.replace(/&quot;/g, '"');
-  
+
   // Clean up extra whitespace
   md = md.replace(/\n{3,}/g, '\n\n');
   md = md.trim();
-  
+
   return md;
 }
 
 const FONTS: Record<string, string> = {
-  mono: "'IBM Plex Mono', monospace",
-  serif: "'Merriweather', Georgia, serif",
   sans: "'Inter', system-ui, sans-serif",
+  serif: "'Playfair Display', Georgia, serif",
+  mono: "'JetBrains Mono', monospace",
+  typewriter: "'Courier Prime', monospace",
+  hand: "'Caveat', cursive",
 };
 
 // Compress image
@@ -198,8 +200,8 @@ export function TiptapEditor() {
 
   const updateNote = useCallback((id: string, content: string) => {
     setNotes(prev => {
-      const updated = prev.map(note => 
-        note.id === id 
+      const updated = prev.map(note =>
+        note.id === id
           ? { ...note, content, updatedAt: Date.now() }
           : note
       );
@@ -227,7 +229,7 @@ export function TiptapEditor() {
     setNotes(prev => {
       const updated = prev.filter(n => n.id !== id);
       saveNotes(updated);
-      
+
       if (id === activeNoteId) {
         if (updated.length > 0) {
           setActiveNoteId(updated[0].id);
@@ -239,7 +241,7 @@ export function TiptapEditor() {
           return withNew;
         }
       }
-      
+
       return updated;
     });
   }, [activeNoteId]);
@@ -247,11 +249,11 @@ export function TiptapEditor() {
   // Export to Markdown
   const handleExportMarkdown = useCallback(() => {
     if (!activeNote) return;
-    
+
     const markdown = htmlToMarkdown(activeNote.content);
     const title = getNoteTitleFromContent(activeNote.content) || 'untitled';
     const filename = `${title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.md`;
-    
+
     const blob = new Blob([markdown], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -266,7 +268,7 @@ export function TiptapEditor() {
     const html = markdownToHtml(content);
     const newNote = createNote();
     newNote.content = html;
-    
+
     setNotes(prev => {
       const updated = [newNote, ...prev];
       saveNotes(updated);
@@ -277,28 +279,28 @@ export function TiptapEditor() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
-      
+
       // Ctrl/Cmd + Shift + E = Export
       if (isMod && e.shiftKey && e.key.toLowerCase() === 'e') {
         e.preventDefault();
         handleExportMarkdown();
         return;
       }
-      
+
       // Ctrl/Cmd + N = New note
       if (isMod && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         handleCreateNote();
         return;
       }
-      
+
       // Escape = Close panel
       if (e.key === 'Escape' && showPanel) {
         setShowPanel(false);
         return;
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleExportMarkdown, handleCreateNote, showPanel]);
@@ -366,7 +368,7 @@ export function TiptapEditor() {
       handlePaste: (view, event, slice) => {
         const items = Array.from(event.clipboardData?.items ?? []);
         const images = items.filter(item => item.type.startsWith('image/'));
-        
+
         // Handle image paste
         if (images.length > 0) {
           event.preventDefault();
@@ -386,22 +388,22 @@ export function TiptapEditor() {
           });
           return true;
         }
-        
+
         // Handle markdown paste
         const text = event.clipboardData?.getData('text/plain');
         if (text && looksLikeMarkdown(text)) {
           event.preventDefault();
           const html = markdownToHtml(text);
-          
+
           // Use editorRef to insert content
           if (editorRef.current) {
             editorRef.current.commands.insertContent(html);
             return true;
           }
-          
+
           return false;
         }
-        
+
         return false;
       },
     },
@@ -493,12 +495,12 @@ export function TiptapEditor() {
   }, [activeNote?.content]);
 
   if (isLoading) {
-    return <div className={`min-h-svh ${theme === 'dark' ? 'bg-black' : 'bg-neutral-50'}`} />;
+    return <div className="min-h-svh bg-transparent" />;
   }
 
   return (
-    <div 
-      className={`min-h-svh flex flex-col relative ${theme === 'dark' ? 'bg-black' : 'bg-neutral-50'}`}
+    <div
+      className="min-h-svh flex flex-col relative bg-transparent"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -506,7 +508,7 @@ export function TiptapEditor() {
     >
       {/* Drag overlay */}
       {isDragging && (
-        <div className={`fixed inset-0 z-40 flex items-center justify-center pointer-events-none ${theme === 'dark' ? 'bg-black/95' : 'bg-white/95'}`}>
+        <div className={`fixed inset-0 z-40 flex items-center justify-center pointer-events-none backdrop-blur-sm ${theme === 'dark' ? 'bg-black/40' : 'bg-white/40'}`}>
           <div className={`flex flex-col items-center gap-2 ${theme === 'dark' ? 'text-neutral-500' : 'text-neutral-400'}`}>
             <ImagePlus className="w-8 h-8" strokeWidth={1.5} />
             <span className="text-sm font-mono">Drop image</span>
@@ -544,7 +546,7 @@ export function TiptapEditor() {
 
       {/* Editor */}
       <main className="flex-1">
-        <article 
+        <article
           className="w-full px-4 sm:px-6 pt-6 sm:pt-8 pb-24"
           style={{ fontFamily: FONTS[selectedFont] }}
         >
@@ -556,11 +558,10 @@ export function TiptapEditor() {
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10">
         <button
           onClick={() => setShowPanel(true)}
-          className={`p-3 border rounded-full transition-all duration-200 ${
-            theme === 'dark' 
-              ? 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-400 hover:text-neutral-200' 
-              : 'bg-white hover:bg-neutral-100 border-neutral-200 text-neutral-500 hover:text-neutral-700 shadow-sm'
-          }`}
+          className={`p-3 border rounded-full transition-all duration-200 backdrop-blur-xl shadow-lg hover:scale-105 active:scale-95 ${theme === 'dark'
+            ? 'bg-black/40 hover:bg-black/60 border-white/20 text-white'
+            : 'bg-white/40 hover:bg-white/60 border-white/20 text-neutral-600'
+            }`}
           aria-label="Menu"
         >
           <Menu className="w-5 h-5" strokeWidth={1.5} />

@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap');
 
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Inter:wght@100..900&family=JetBrains+Mono:wght@100..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,6 +10,10 @@
   :root {
     --background: 0 0% 98%;
     --foreground: 0 0% 10%;
+
+    /* Premium Gradient Backgrounds */
+    --bg-gradient-light: radial-gradient(circle at 50% 0%, #f1f5f9 0%, #cbd5e1 100%);
+    --bg-gradient-dark: radial-gradient(circle at 50% 0%, #1e1e2e 0%, #000000 70%);
 
     --card: 0 0% 100%;
     --card-foreground: 0 0% 10%;
@@ -100,16 +106,19 @@
 
   html.dark {
     color-scheme: dark;
-    background-color: #000;
+    background: var(--bg-gradient-dark);
+    background-attachment: fixed;
   }
 
   html.light {
     color-scheme: light;
-    background-color: #fafafa;
+    background: var(--bg-gradient-light);
+    background-attachment: fixed;
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply text-foreground antialiased;
+    background: transparent;
     font-family: var(--font-mono);
     font-feature-settings: "liga" 1, "calt" 1;
     text-rendering: optimizeLegibility;
@@ -326,13 +335,13 @@
     margin: 0;
   }
 
-  .dark .tiptap-editor ul > li::marker,
-  .dark .tiptap-editor ol > li::marker {
+  .dark .tiptap-editor ul>li::marker,
+  .dark .tiptap-editor ol>li::marker {
     color: #a3a3a3;
   }
 
-  .light .tiptap-editor ul > li::marker,
-  .light .tiptap-editor ol > li::marker {
+  .light .tiptap-editor ul>li::marker,
+  .light .tiptap-editor ol>li::marker {
     color: #737373;
   }
 
@@ -348,12 +357,12 @@
     gap: 0.5em;
   }
 
-  .tiptap-editor ul[data-type="taskList"] li > label {
+  .tiptap-editor ul[data-type="taskList"] li>label {
     flex: 0 0 auto;
     margin-top: 0.25em;
   }
 
-  .tiptap-editor ul[data-type="taskList"] li > div {
+  .tiptap-editor ul[data-type="taskList"] li>div {
     flex: 1 1 auto;
   }
 
@@ -405,12 +414,12 @@
     line-height: 1.3;
   }
 
-  .dark .tiptap-editor ul[data-type="taskList"] li[data-checked="true"] > div {
+  .dark .tiptap-editor ul[data-type="taskList"] li[data-checked="true"]>div {
     text-decoration: line-through;
     color: #525252;
   }
 
-  .light .tiptap-editor ul[data-type="taskList"] li[data-checked="true"] > div {
+  .light .tiptap-editor ul[data-type="taskList"] li[data-checked="true"]>div {
     text-decoration: line-through;
     color: #a3a3a3;
   }

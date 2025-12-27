@@ -356,7 +356,7 @@ export function TiptapEditor() {
         </article>
       </main>
 
-      {/* Bottom button - Menu */}
+      {/* Single bottom button - Menu */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10">
         <button
           onClick={() => setShowPanel(true)}

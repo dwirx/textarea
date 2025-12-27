@@ -8,11 +8,16 @@ import Dropcursor from '@tiptap/extension-dropcursor';
 import Link from '@tiptap/extension-link';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
-import { ListFilter, ImagePlus, HelpCircle } from 'lucide-react';
+import { Menu, ImagePlus } from 'lucide-react';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { NotesPanel } from './NotesPanel';
-import { HelpPanel } from './HelpPanel';
 import { Note, loadNotes, saveNotes, createNote, getNoteTitleFromContent } from '@/lib/notes';
+
+const FONTS: Record<string, string> = {
+  mono: "'IBM Plex Mono', monospace",
+  serif: "'Merriweather', Georgia, serif",
+  sans: "'Inter', system-ui, sans-serif",
+};
 
 // Compress image
 async function compressImage(file: File, maxWidth = 1200, quality = 0.8): Promise<string> {
@@ -50,13 +55,21 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number) {
 
 export function TiptapEditor() {
   const [showPanel, setShowPanel] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedFont, setSelectedFont] = useState(() => {
+    return localStorage.getItem('textarea-font') || 'mono';
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCountRef = useRef(0);
+
+  // Save font preference
+  const handleSelectFont = useCallback((fontId: string) => {
+    setSelectedFont(fontId);
+    localStorage.setItem('textarea-font', fontId);
+  }, []);
 
   // Load notes on mount
   useEffect(() => {
@@ -131,7 +144,7 @@ export function TiptapEditor() {
         codeBlock: false,
       }),
       Placeholder.configure({
-        placeholder: 'Start typing... (Press ? for help)',
+        placeholder: '',
         emptyEditorClass: 'is-editor-empty',
       }),
       Typography,
@@ -314,16 +327,13 @@ export function TiptapEditor() {
         <NotesPanel
           notes={notes}
           activeNoteId={activeNoteId}
+          selectedFont={selectedFont}
           onSelectNote={setActiveNoteId}
           onCreateNote={handleCreateNote}
           onDeleteNote={handleDeleteNote}
+          onSelectFont={handleSelectFont}
           onClose={() => setShowPanel(false)}
         />
-      )}
-
-      {/* Help panel */}
-      {showHelp && (
-        <HelpPanel onClose={() => setShowHelp(false)} />
       )}
 
       {/* Hidden file input */}
@@ -338,26 +348,22 @@ export function TiptapEditor() {
 
       {/* Editor */}
       <main className="flex-1">
-        <article className="w-full px-4 sm:px-6 pt-6 sm:pt-8 pb-24">
+        <article 
+          className="w-full px-4 sm:px-6 pt-6 sm:pt-8 pb-24"
+          style={{ fontFamily: FONTS[selectedFont] }}
+        >
           <EditorContent editor={editor} />
         </article>
       </main>
 
-      {/* Bottom buttons */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4">
-        <button
-          onClick={() => setShowHelp(true)}
-          className="p-2 text-neutral-600 hover:text-neutral-300 transition-colors duration-200"
-          aria-label="Help"
-        >
-          <HelpCircle className="w-4 h-4" strokeWidth={1.5} />
-        </button>
+      {/* Single bottom button - Menu */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10">
         <button
           onClick={() => setShowPanel(true)}
-          className="p-2 text-neutral-600 hover:text-neutral-300 transition-colors duration-200"
-          aria-label="Open notes"
+          className="p-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-full text-neutral-400 hover:text-neutral-200 transition-all duration-200"
+          aria-label="Menu"
         >
-          <ListFilter className="w-4 h-4" strokeWidth={1.5} />
+          <Menu className="w-5 h-5" strokeWidth={1.5} />
         </button>
       </div>
     </div>

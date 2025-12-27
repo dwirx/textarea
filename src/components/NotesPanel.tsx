@@ -1,5 +1,5 @@
 import { Note, getNoteTitleFromContent } from '@/lib/notes';
-import { Search, X, User } from 'lucide-react';
+import { X, User } from 'lucide-react';
 import { useState, useMemo } from 'react';
 
 interface NotesPanelProps {
@@ -50,11 +50,11 @@ export function NotesPanel({
   }, [notes, searchQuery]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-background">
+    <div className="fixed inset-0 z-50 bg-black">
       {/* Close button - top right */}
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 p-1.5 text-muted-foreground/60 hover:text-foreground transition-colors"
+        className="absolute top-4 right-4 p-1.5 text-neutral-500 hover:text-neutral-300 transition-colors"
         aria-label="Close"
       >
         <X className="w-5 h-5" strokeWidth={1.5} />
@@ -69,7 +69,7 @@ export function NotesPanel({
             placeholder="Search notes"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#1a1a1a] border border-[#333] rounded-md px-4 py-3 text-sm font-mono placeholder:text-muted-foreground/40 focus:outline-none focus:border-[#444]"
+            className="w-full bg-neutral-900 border border-neutral-800 rounded-md px-4 py-3 text-sm font-mono text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:border-neutral-700"
             autoFocus
           />
         </div>
@@ -92,12 +92,12 @@ export function NotesPanel({
                     }}
                     className="text-left"
                   >
-                    <span className="text-sm font-mono underline underline-offset-2 hover:text-muted-foreground transition-colors">
+                    <span className="text-sm font-mono text-neutral-200 underline underline-offset-2 hover:text-neutral-400 transition-colors">
                       {title}
                     </span>
                   </button>
                   
-                  <span className="text-xs font-mono text-muted-foreground/60 whitespace-nowrap underline underline-offset-2">
+                  <span className="text-xs font-mono text-neutral-600 whitespace-nowrap underline underline-offset-2">
                     {formatFullDate(note.updatedAt)}
                   </span>
                 </div>
@@ -105,7 +105,7 @@ export function NotesPanel({
                 {/* Delete button on hover */}
                 <button
                   onClick={() => onDeleteNote(note.id)}
-                  className="absolute -right-8 top-0 p-1 opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-foreground transition-all"
+                  className="absolute -right-8 top-0 p-1 opacity-0 group-hover:opacity-100 text-neutral-600 hover:text-neutral-300 transition-all"
                   aria-label="Delete note"
                 >
                   <X className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -122,7 +122,7 @@ export function NotesPanel({
               onCreateNote();
               onClose();
             }}
-            className="px-4 py-2 bg-[#1a1a1a] hover:bg-[#222] border border-[#333] rounded-md text-sm font-mono transition-colors"
+            className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-md text-sm font-mono text-neutral-200 transition-colors"
           >
             Create note
           </button>
@@ -130,30 +130,25 @@ export function NotesPanel({
 
         {/* Attribution */}
         <div className="mt-6">
-          <span className="text-xs font-mono text-muted-foreground/50">
+          <span className="text-xs font-mono text-neutral-600">
             Created by{' '}
-            <a 
-              href="https://github.com/hesselbom" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-muted-foreground transition-colors"
-            >
-              @hesselbom
-            </a>
+            <span className="underline underline-offset-2">
+              nobody
+            </span>
           </span>
         </div>
       </div>
 
       {/* User avatar - right side */}
       <div className="fixed right-6 top-1/2 -translate-y-1/2">
-        <div className="w-10 h-10 rounded-full border border-[#333] flex items-center justify-center text-muted-foreground/40">
+        <div className="w-10 h-10 rounded-full border border-neutral-800 flex items-center justify-center text-neutral-600">
           <User className="w-5 h-5" strokeWidth={1.5} />
         </div>
       </div>
 
       {/* Bottom center dot */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2">
-        <div className="w-2 h-2 rounded-full bg-muted-foreground/20" />
+        <div className="w-2 h-2 rounded-full bg-neutral-700" />
       </div>
     </div>
   );

@@ -101,7 +101,7 @@ export function TiptapEditor() {
     markdown: string;
     originalText: string;
   } | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number; width?: number; height?: number }>({ x: 0, y: 0 });
   const [editValue, setEditValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCountRef = useRef(0);
@@ -361,6 +361,10 @@ export function TiptapEditor() {
       
       if (markdown && markdown.length > 0) {
         const rect = target.getBoundingClientRect();
+        
+        // Hide the original element
+        target.style.visibility = 'hidden';
+        
         setEditingElement({ 
           target, 
           tagName, 
@@ -368,11 +372,19 @@ export function TiptapEditor() {
           originalText: target.textContent || '' 
         });
         setEditValue(markdown);
-        // Position below the element
-        setTooltipPos({ x: rect.left, y: rect.bottom + 8 });
+        // Position exactly at the element
+        setTooltipPos({ 
+          x: rect.left, 
+          y: rect.top,
+          width: Math.max(rect.width, 200),
+          height: rect.height
+        } as any);
         
         // Focus input after render
-        setTimeout(() => editInputRef.current?.focus(), 10);
+        setTimeout(() => {
+          editInputRef.current?.focus();
+          editInputRef.current?.select();
+        }, 10);
       }
     }
   }, [editingElement]);
@@ -381,11 +393,9 @@ export function TiptapEditor() {
   const applyEdit = useCallback(() => {
     if (!editingElement || !editor) return;
     
-    const { tagName, originalText } = editingElement;
     let newText = editValue;
     
     // Parse markdown back to plain text for content update
-    // Remove markdown syntax to get clean text
     newText = newText
       .replace(/^#{1,3}\s*/, '')  // Remove heading markers
       .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove bold
@@ -393,8 +403,9 @@ export function TiptapEditor() {
       .replace(/`(.*?)`/g, '$1')  // Remove code
       .replace(/^-\s*/, '');  // Remove list marker
     
-    // Update the target element's text content directly
+    // Restore visibility and update content
     if (editingElement.target && editingElement.target.isConnected) {
+      editingElement.target.style.visibility = 'visible';
       editingElement.target.textContent = newText;
       
       // Trigger editor update
@@ -408,16 +419,24 @@ export function TiptapEditor() {
     setEditValue('');
   }, [editingElement, editValue, editor, activeNoteId, updateNote]);
 
+  // Cancel edit
+  const cancelEdit = useCallback(() => {
+    if (editingElement?.target) {
+      editingElement.target.style.visibility = 'visible';
+    }
+    setEditingElement(null);
+    setEditValue('');
+  }, [editingElement]);
+
   // Handle key events in edit input
   const handleEditKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       applyEdit();
     } else if (e.key === 'Escape') {
-      setEditingElement(null);
-      setEditValue('');
+      cancelEdit();
     }
-  }, [applyEdit]);
+  }, [applyEdit, cancelEdit]);
 
   // Close edit on click outside
   const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -480,30 +499,31 @@ export function TiptapEditor() {
         className="hidden"
       />
 
-      {/* Editable markdown popup */}
+      {/* Inline markdown editor - appears at element position */}
       {editingElement && (
         <div 
-          className="markdown-edit-popup fixed z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+          className="markdown-edit-popup fixed z-50"
           style={{ 
-            left: Math.min(tooltipPos.x, window.innerWidth - 320), 
-            top: tooltipPos.y,
+            left: tooltipPos.x - 4, 
+            top: tooltipPos.y - 4,
           }}
         >
-          <div className="bg-neutral-900 border border-neutral-700 rounded-lg shadow-2xl overflow-hidden">
-            <div className="px-3 py-1.5 bg-neutral-800 border-b border-neutral-700 flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium">Markdown</span>
-              <span className="text-[10px] text-neutral-600">Enter untuk simpan, Esc untuk batal</span>
-            </div>
-            <input
-              ref={editInputRef}
-              type="text"
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              onKeyDown={handleEditKeyDown}
-              className="w-[300px] px-3 py-2 bg-transparent text-emerald-400 font-mono text-sm focus:outline-none"
-              placeholder="Edit markdown..."
-            />
-          </div>
+          <input
+            ref={editInputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleEditKeyDown}
+            onBlur={applyEdit}
+            className="px-1 py-0.5 bg-neutral-900 border border-emerald-500/50 rounded text-emerald-400 font-mono focus:outline-none focus:border-emerald-400 shadow-lg shadow-emerald-500/10"
+            style={{
+              fontSize: editingElement.tagName === 'h1' ? '2rem' : 
+                       editingElement.tagName === 'h2' ? '1.5rem' : 
+                       editingElement.tagName === 'h3' ? '1.25rem' : '1rem',
+              fontWeight: ['h1', 'h2', 'h3', 'strong', 'b'].includes(editingElement.tagName) ? 'bold' : 'normal',
+              minWidth: tooltipPos.width || 200,
+            }}
+          />
         </div>
       )}
 

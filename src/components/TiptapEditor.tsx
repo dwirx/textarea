@@ -352,7 +352,10 @@ export function TiptapEditor() {
       const markdown = prefix + text + suffix;
       
       const rect = target.getBoundingClientRect();
-      target.style.opacity = '0';
+      
+      // Hide original element completely
+      target.style.visibility = 'hidden';
+      target.style.position = 'relative';
       
       setEditingElement({
         element: target,
@@ -364,7 +367,9 @@ export function TiptapEditor() {
       
       setTimeout(() => {
         editInputRef.current?.focus();
-        editInputRef.current?.select();
+        // Place cursor at end
+        const len = editInputRef.current?.value.length || 0;
+        editInputRef.current?.setSelectionRange(len, len);
       }, 0);
     }
   }, [editingElement]);
@@ -373,7 +378,7 @@ export function TiptapEditor() {
   const applyEdit = useCallback(() => {
     if (!editingElement || !editor) return;
     
-    const { element, tagName } = editingElement;
+    const { element } = editingElement;
     let newText = editValue;
     
     // Remove markdown syntax
@@ -385,7 +390,7 @@ export function TiptapEditor() {
       .replace(/^-\s*/, '');
     
     if (element && element.isConnected) {
-      element.style.opacity = '1';
+      element.style.visibility = 'visible';
       element.textContent = newText;
       
       if (activeNoteId) {
@@ -405,7 +410,7 @@ export function TiptapEditor() {
       applyEdit();
     } else if (e.key === 'Escape') {
       if (editingElement?.element) {
-        editingElement.element.style.opacity = '1';
+        editingElement.element.style.visibility = 'visible';
       }
       setEditingElement(null);
       setEditValue('');
@@ -460,27 +465,34 @@ export function TiptapEditor() {
 
       {/* Inline markdown editor overlay */}
       {editingElement && (
-        <input
-          ref={editInputRef}
-          type="text"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleEditKeyDown}
-          onBlur={applyEdit}
-          className="fixed z-50 bg-transparent text-neutral-100 font-mono focus:outline-none"
+        <div 
+          className="fixed z-[100] bg-black"
           style={{
-            left: editingElement.rect.left - 4,
+            left: editingElement.rect.left,
             top: editingElement.rect.top,
-            fontSize: editingElement.tagName === 'h1' ? '2rem' : 
-                     editingElement.tagName === 'h2' ? '1.5rem' : 
-                     editingElement.tagName === 'h3' ? '1.25rem' : '1rem',
-            fontWeight: ['h1', 'h2', 'h3', 'strong', 'b'].includes(editingElement.tagName) ? 'bold' : 'normal',
-            fontStyle: ['em', 'i'].includes(editingElement.tagName) ? 'italic' : 'normal',
-            minWidth: Math.max(editingElement.rect.width + 50, 200),
-            height: editingElement.rect.height,
-            lineHeight: `${editingElement.rect.height}px`,
+            minWidth: Math.max(editingElement.rect.width + 100, 300),
+            height: editingElement.rect.height + 4,
           }}
-        />
+        >
+          <input
+            ref={editInputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleEditKeyDown}
+            onBlur={applyEdit}
+            className="w-full h-full bg-black text-neutral-100 font-mono focus:outline-none border-b border-neutral-700"
+            style={{
+              fontSize: editingElement.tagName === 'h1' ? '2rem' : 
+                       editingElement.tagName === 'h2' ? '1.5rem' : 
+                       editingElement.tagName === 'h3' ? '1.25rem' : '1rem',
+              fontWeight: ['h1', 'h2', 'h3', 'strong', 'b'].includes(editingElement.tagName) ? 'bold' : 'normal',
+              fontStyle: ['em', 'i'].includes(editingElement.tagName) ? 'italic' : 'normal',
+              lineHeight: `${editingElement.rect.height}px`,
+              paddingLeft: 0,
+            }}
+          />
+        </div>
       )}
 
       {/* Editor */}

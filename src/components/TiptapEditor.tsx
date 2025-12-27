@@ -12,12 +12,6 @@ import { Menu, ImagePlus } from 'lucide-react';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { NotesPanel } from './NotesPanel';
 import { Note, loadNotes, saveNotes, createNote, getNoteTitleFromContent } from '@/lib/notes';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 const FONTS: Record<string, string> = {
   mono: "'IBM Plex Mono', monospace",
@@ -59,33 +53,6 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number) {
   };
 }
 
-// Convert HTML to Markdown-like syntax for tooltip display
-function htmlToMarkdownPreview(html: string): string {
-  let md = html;
-  // Headings
-  md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1');
-  md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1');
-  md = md.replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1');
-  // Bold
-  md = md.replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**');
-  md = md.replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**');
-  // Italic
-  md = md.replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*');
-  md = md.replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*');
-  // Code
-  md = md.replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`');
-  // Lists
-  md = md.replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1');
-  // Remove other tags
-  md = md.replace(/<[^>]+>/g, '');
-  // Decode entities
-  md = md.replace(/&nbsp;/g, ' ');
-  md = md.replace(/&amp;/g, '&');
-  md = md.replace(/&lt;/g, '<');
-  md = md.replace(/&gt;/g, '>');
-  return md.trim();
-}
-
 export function TiptapEditor() {
   const [showPanel, setShowPanel] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -95,18 +62,8 @@ export function TiptapEditor() {
   const [selectedFont, setSelectedFont] = useState(() => {
     return localStorage.getItem('textarea-font') || 'mono';
   });
-  const [editingElement, setEditingElement] = useState<{ 
-    target: HTMLElement; 
-    tagName: string;
-    markdown: string;
-    originalText: string;
-  } | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number; width?: number; height?: number }>({ x: 0, y: 0 });
-  const [editValue, setEditValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCountRef = useRef(0);
-  const editorRef = useRef<HTMLDivElement>(null);
-  const editInputRef = useRef<HTMLInputElement>(null);
 
   // Save font preference
   const handleSelectFont = useCallback((fontId: string) => {
@@ -343,116 +300,6 @@ export function TiptapEditor() {
     }
   }, [activeNote?.content]);
 
-  // Handle click on elements to edit markdown source
-  const handleEditorClick = useCallback((e: React.MouseEvent) => {
-    // Don't interfere if clicking inside edit input
-    if (editingElement) return;
-    
-    const target = e.target as HTMLElement;
-    const tagName = target.tagName.toLowerCase();
-    
-    // Check if clicking on heading, strong, em, code, li, p
-    if (['h1', 'h2', 'h3', 'strong', 'em', 'code', 'li', 'b', 'i', 'p'].includes(tagName)) {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      const outerHTML = target.outerHTML;
-      const markdown = htmlToMarkdownPreview(outerHTML);
-      
-      if (markdown && markdown.length > 0) {
-        const rect = target.getBoundingClientRect();
-        
-        // Hide the original element
-        target.style.visibility = 'hidden';
-        
-        setEditingElement({ 
-          target, 
-          tagName, 
-          markdown, 
-          originalText: target.textContent || '' 
-        });
-        setEditValue(markdown);
-        // Position exactly at the element
-        setTooltipPos({ 
-          x: rect.left, 
-          y: rect.top,
-          width: Math.max(rect.width, 200),
-          height: rect.height
-        } as any);
-        
-        // Focus input after render
-        setTimeout(() => {
-          editInputRef.current?.focus();
-          editInputRef.current?.select();
-        }, 10);
-      }
-    }
-  }, [editingElement]);
-
-  // Apply edit and update editor content
-  const applyEdit = useCallback(() => {
-    if (!editingElement || !editor) return;
-    
-    let newText = editValue;
-    
-    // Parse markdown back to plain text for content update
-    newText = newText
-      .replace(/^#{1,3}\s*/, '')  // Remove heading markers
-      .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove bold
-      .replace(/\*(.*?)\*/g, '$1')  // Remove italic
-      .replace(/`(.*?)`/g, '$1')  // Remove code
-      .replace(/^-\s*/, '');  // Remove list marker
-    
-    // Restore visibility and update content
-    if (editingElement.target && editingElement.target.isConnected) {
-      editingElement.target.style.visibility = 'visible';
-      editingElement.target.textContent = newText;
-      
-      // Trigger editor update
-      if (activeNoteId) {
-        const html = editor.getHTML();
-        updateNote(activeNoteId, html);
-      }
-    }
-    
-    setEditingElement(null);
-    setEditValue('');
-  }, [editingElement, editValue, editor, activeNoteId, updateNote]);
-
-  // Cancel edit
-  const cancelEdit = useCallback(() => {
-    if (editingElement?.target) {
-      editingElement.target.style.visibility = 'visible';
-    }
-    setEditingElement(null);
-    setEditValue('');
-  }, [editingElement]);
-
-  // Handle key events in edit input
-  const handleEditKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      applyEdit();
-    } else if (e.key === 'Escape') {
-      cancelEdit();
-    }
-  }, [applyEdit, cancelEdit]);
-
-  // Close edit on click outside
-  const handleClickOutside = useCallback((e: MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (editingElement && !target.closest('.markdown-edit-popup')) {
-      applyEdit();
-    }
-  }, [editingElement, applyEdit]);
-
-  useEffect(() => {
-    if (editingElement) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [editingElement, handleClickOutside]);
-
   if (isLoading) {
     return <div className="min-h-svh bg-black" />;
   }
@@ -499,41 +346,11 @@ export function TiptapEditor() {
         className="hidden"
       />
 
-      {/* Inline markdown editor - appears at element position */}
-      {editingElement && (
-        <div 
-          className="markdown-edit-popup fixed z-50"
-          style={{ 
-            left: tooltipPos.x - 4, 
-            top: tooltipPos.y - 4,
-          }}
-        >
-          <input
-            ref={editInputRef}
-            type="text"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onKeyDown={handleEditKeyDown}
-            onBlur={applyEdit}
-            className="px-1 py-0.5 bg-neutral-900 border border-emerald-500/50 rounded text-emerald-400 font-mono focus:outline-none focus:border-emerald-400 shadow-lg shadow-emerald-500/10"
-            style={{
-              fontSize: editingElement.tagName === 'h1' ? '2rem' : 
-                       editingElement.tagName === 'h2' ? '1.5rem' : 
-                       editingElement.tagName === 'h3' ? '1.25rem' : '1rem',
-              fontWeight: ['h1', 'h2', 'h3', 'strong', 'b'].includes(editingElement.tagName) ? 'bold' : 'normal',
-              minWidth: tooltipPos.width || 200,
-            }}
-          />
-        </div>
-      )}
-
       {/* Editor */}
       <main className="flex-1">
         <article 
           className="w-full px-4 sm:px-6 pt-6 sm:pt-8 pb-24"
           style={{ fontFamily: FONTS[selectedFont] }}
-          ref={editorRef}
-          onClick={handleEditorClick}
         >
           <EditorContent editor={editor} />
         </article>

@@ -35,6 +35,76 @@ function looksLikeMarkdown(text: string): boolean {
   return mdPatterns.some(pattern => pattern.test(text));
 }
 
+// Convert HTML to Markdown for export
+function htmlToMarkdown(html: string): string {
+  let md = html;
+  
+  // Headings
+  md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n');
+  md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n');
+  md = md.replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n');
+  
+  // Bold and italic
+  md = md.replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**');
+  md = md.replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**');
+  md = md.replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*');
+  md = md.replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*');
+  
+  // Strikethrough
+  md = md.replace(/<s[^>]*>(.*?)<\/s>/gi, '~~$1~~');
+  
+  // Code
+  md = md.replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`');
+  md = md.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi, '```\n$1\n```\n\n');
+  
+  // Links
+  md = md.replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)');
+  
+  // Images
+  md = md.replace(/<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*\/?>/gi, '![$2]($1)');
+  md = md.replace(/<img[^>]*src="([^"]*)"[^>]*\/?>/gi, '![]($1)');
+  
+  // Lists
+  md = md.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (_, content) => {
+    return content.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '- $1\n') + '\n';
+  });
+  md = md.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (_, content) => {
+    let index = 0;
+    return content.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, () => {
+      index++;
+      return `${index}. \n`;
+    }) + '\n';
+  });
+  
+  // Blockquotes
+  md = md.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, content) => {
+    return content.split('\n').map((line: string) => `> ${line}`).join('\n') + '\n\n';
+  });
+  
+  // Horizontal rule
+  md = md.replace(/<hr[^>]*\/?>/gi, '\n---\n\n');
+  
+  // Paragraphs and line breaks
+  md = md.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '$1\n\n');
+  md = md.replace(/<br[^>]*\/?>/gi, '\n');
+  
+  // Clean up remaining tags
+  md = md.replace(/<[^>]+>/g, '');
+  
+  // Decode HTML entities
+  md = md.replace(/&nbsp;/g, ' ');
+  md = md.replace(/&amp;/g, '&');
+  md = md.replace(/&lt;/g, '<');
+  md = md.replace(/&gt;/g, '>');
+  md = md.replace(/&quot;/g, '"');
+  
+  // Clean up extra whitespace
+  md = md.replace(/\n{3,}/g, '\n\n');
+  md = md.trim();
+  
+  return md;
+}
+
 const FONTS: Record<string, string> = {
   mono: "'IBM Plex Mono', monospace",
   serif: "'Merriweather', Georgia, serif",
@@ -158,6 +228,53 @@ export function TiptapEditor() {
       return updated;
     });
   }, [activeNoteId]);
+
+  // Export to Markdown
+  const handleExportMarkdown = useCallback(() => {
+    if (!activeNote) return;
+    
+    const markdown = htmlToMarkdown(activeNote.content);
+    const title = getNoteTitleFromContent(activeNote.content) || 'untitled';
+    const filename = `${title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.md`;
+    
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [activeNote]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey;
+      
+      // Ctrl/Cmd + Shift + E = Export
+      if (isMod && e.shiftKey && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        handleExportMarkdown();
+        return;
+      }
+      
+      // Ctrl/Cmd + N = New note
+      if (isMod && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        handleCreateNote();
+        return;
+      }
+      
+      // Escape = Close panel
+      if (e.key === 'Escape' && showPanel) {
+        setShowPanel(false);
+        return;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleExportMarkdown, handleCreateNote, showPanel]);
 
   const editor = useEditor({
     extensions: [
@@ -380,6 +497,7 @@ export function TiptapEditor() {
           onCreateNote={handleCreateNote}
           onDeleteNote={handleDeleteNote}
           onSelectFont={handleSelectFont}
+          onExportMarkdown={handleExportMarkdown}
           onClose={() => setShowPanel(false)}
         />
       )}

@@ -1,5 +1,5 @@
 import { Note, getNoteTitleFromContent } from '@/lib/notes';
-import { X, User, HelpCircle, ChevronDown } from 'lucide-react';
+import { X, User, HelpCircle, ChevronDown, Download, Keyboard } from 'lucide-react';
 import { useState, useMemo } from 'react';
 
 interface NotesPanelProps {
@@ -10,7 +10,83 @@ interface NotesPanelProps {
   onCreateNote: () => void;
   onDeleteNote: (id: string) => void;
   onSelectFont: (font: string) => void;
+  onExportMarkdown: () => void;
   onClose: () => void;
+}
+
+// Convert HTML to Markdown
+function htmlToMarkdown(html: string): string {
+  let md = html;
+  
+  // Headings
+  md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n');
+  md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n');
+  md = md.replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n');
+  
+  // Bold and italic
+  md = md.replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**');
+  md = md.replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**');
+  md = md.replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*');
+  md = md.replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*');
+  
+  // Strikethrough
+  md = md.replace(/<s[^>]*>(.*?)<\/s>/gi, '~~$1~~');
+  md = md.replace(/<strike[^>]*>(.*?)<\/strike>/gi, '~~$1~~');
+  
+  // Code
+  md = md.replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`');
+  md = md.replace(/<pre[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi, '```\n$1\n```\n\n');
+  
+  // Links
+  md = md.replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)');
+  
+  // Images
+  md = md.replace(/<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*\/?>/gi, '![$2]($1)');
+  md = md.replace(/<img[^>]*src="([^"]*)"[^>]*\/?>/gi, '![]($1)');
+  
+  // Lists
+  md = md.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (_, content) => {
+    return content.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '- $1\n') + '\n';
+  });
+  md = md.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (_, content) => {
+    let index = 0;
+    return content.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, () => {
+      index++;
+      return `${index}. $1\n`;
+    }) + '\n';
+  });
+  
+  // Task lists
+  md = md.replace(/<li[^>]*data-checked="true"[^>]*>([\s\S]*?)<\/li>/gi, '[x] $1\n');
+  md = md.replace(/<li[^>]*data-checked="false"[^>]*>([\s\S]*?)<\/li>/gi, '[ ] $1\n');
+  
+  // Blockquotes
+  md = md.replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, content) => {
+    return content.split('\n').map((line: string) => `> ${line}`).join('\n') + '\n\n';
+  });
+  
+  // Horizontal rule
+  md = md.replace(/<hr[^>]*\/?>/gi, '\n---\n\n');
+  
+  // Paragraphs and line breaks
+  md = md.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '$1\n\n');
+  md = md.replace(/<br[^>]*\/?>/gi, '\n');
+  
+  // Clean up remaining tags
+  md = md.replace(/<[^>]+>/g, '');
+  
+  // Decode HTML entities
+  md = md.replace(/&nbsp;/g, ' ');
+  md = md.replace(/&amp;/g, '&');
+  md = md.replace(/&lt;/g, '<');
+  md = md.replace(/&gt;/g, '>');
+  md = md.replace(/&quot;/g, '"');
+  
+  // Clean up extra whitespace
+  md = md.replace(/\n{3,}/g, '\n\n');
+  md = md.trim();
+  
+  return md;
 }
 
 function formatFullDate(timestamp: number): string {
@@ -40,6 +116,7 @@ export function NotesPanel({
   onCreateNote,
   onDeleteNote,
   onSelectFont,
+  onExportMarkdown,
   onClose,
 }: NotesPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,11 +193,16 @@ export function NotesPanel({
             </div>
 
             <div>
-              <div className="text-neutral-500 mb-2">SHORTCUTS</div>
+              <div className="text-neutral-500 mb-2">KEYBOARD SHORTCUTS</div>
               <div className="space-y-1 text-neutral-400">
-                <div><code className="text-neutral-300">Cmd+B</code> Bold</div>
-                <div><code className="text-neutral-300">Cmd+I</code> Italic</div>
-                <div><code className="text-neutral-300">Cmd+Z</code> Undo</div>
+                <div><code className="text-neutral-300">Ctrl/Cmd + B</code> Bold</div>
+                <div><code className="text-neutral-300">Ctrl/Cmd + I</code> Italic</div>
+                <div><code className="text-neutral-300">Ctrl/Cmd + Z</code> Undo</div>
+                <div><code className="text-neutral-300">Ctrl/Cmd + Shift + Z</code> Redo</div>
+                <div><code className="text-neutral-300">Ctrl/Cmd + S</code> Save (auto)</div>
+                <div><code className="text-neutral-300">Ctrl/Cmd + Shift + E</code> Export .md</div>
+                <div><code className="text-neutral-300">Ctrl/Cmd + N</code> New note</div>
+                <div><code className="text-neutral-300">Esc</code> Close menu</div>
               </div>
             </div>
           </div>
@@ -244,13 +326,22 @@ export function NotesPanel({
             )}
           </div>
 
+          {/* Export Markdown */}
+          <button
+            onClick={onExportMarkdown}
+            className="flex items-center gap-2 text-sm font-mono text-neutral-500 hover:text-neutral-300 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Export to Markdown
+          </button>
+
           {/* Help link */}
           <button
             onClick={() => setShowHelp(true)}
             className="flex items-center gap-2 text-sm font-mono text-neutral-500 hover:text-neutral-300 transition-colors"
           >
-            <HelpCircle className="w-4 h-4" />
-            Markdown shortcuts
+            <Keyboard className="w-4 h-4" />
+            Keyboard shortcuts
           </button>
         </div>
 

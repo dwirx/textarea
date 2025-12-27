@@ -1,7 +1,7 @@
-import { TextEditor } from '@/components/TextEditor';
+import { TiptapEditor } from '@/components/TiptapEditor';
 
 const Index = () => {
-  return <TextEditor />;
+  return <TiptapEditor />;
 };
 
 export default Index;

@@ -8,7 +8,7 @@ import Dropcursor from '@tiptap/extension-dropcursor';
 import Link from '@tiptap/extension-link';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
-import { Menu, ImagePlus } from 'lucide-react';
+import { Menu, ImagePlus, Code, Eye } from 'lucide-react';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { NotesPanel } from './NotesPanel';
 import { Note, loadNotes, saveNotes, createNote, getNoteTitleFromContent } from '@/lib/notes';
@@ -62,6 +62,7 @@ export function TiptapEditor() {
   const [selectedFont, setSelectedFont] = useState(() => {
     return localStorage.getItem('textarea-font') || 'mono';
   });
+  const [showSource, setShowSource] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCountRef = useRef(0);
 
@@ -346,18 +347,36 @@ export function TiptapEditor() {
         className="hidden"
       />
 
-      {/* Editor */}
+      {/* Editor or Source View */}
       <main className="flex-1">
         <article 
           className="w-full px-4 sm:px-6 pt-6 sm:pt-8 pb-24"
           style={{ fontFamily: FONTS[selectedFont] }}
         >
-          <EditorContent editor={editor} />
+          {showSource ? (
+            <pre className="whitespace-pre-wrap break-words text-sm text-neutral-300 font-mono leading-relaxed">
+              {activeNote?.content || ''}
+            </pre>
+          ) : (
+            <EditorContent editor={editor} />
+          )}
         </article>
       </main>
 
-      {/* Single bottom button - Menu */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10">
+      {/* Bottom buttons */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10 flex items-center gap-3">
+        <button
+          onClick={() => setShowSource(!showSource)}
+          className={`p-3 border rounded-full transition-all duration-200 ${
+            showSource 
+              ? 'bg-neutral-700 border-neutral-600 text-neutral-200' 
+              : 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+          }`}
+          aria-label={showSource ? "View rendered" : "View source"}
+          title={showSource ? "Lihat hasil" : "Lihat source HTML"}
+        >
+          {showSource ? <Eye className="w-5 h-5" strokeWidth={1.5} /> : <Code className="w-5 h-5" strokeWidth={1.5} />}
+        </button>
         <button
           onClick={() => setShowPanel(true)}
           className="p-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-full text-neutral-400 hover:text-neutral-200 transition-all duration-200"

@@ -8,10 +8,16 @@ import Dropcursor from '@tiptap/extension-dropcursor';
 import Link from '@tiptap/extension-link';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
-import { Menu, ImagePlus, Code, Eye } from 'lucide-react';
+import { Menu, ImagePlus } from 'lucide-react';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { NotesPanel } from './NotesPanel';
 import { Note, loadNotes, saveNotes, createNote, getNoteTitleFromContent } from '@/lib/notes';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const FONTS: Record<string, string> = {
   mono: "'IBM Plex Mono', monospace",
@@ -53,6 +59,33 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number) {
   };
 }
 
+// Convert HTML to Markdown-like syntax for tooltip display
+function htmlToMarkdownPreview(html: string): string {
+  let md = html;
+  // Headings
+  md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1');
+  md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1');
+  md = md.replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1');
+  // Bold
+  md = md.replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**');
+  md = md.replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**');
+  // Italic
+  md = md.replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*');
+  md = md.replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*');
+  // Code
+  md = md.replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`');
+  // Lists
+  md = md.replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1');
+  // Remove other tags
+  md = md.replace(/<[^>]+>/g, '');
+  // Decode entities
+  md = md.replace(/&nbsp;/g, ' ');
+  md = md.replace(/&amp;/g, '&');
+  md = md.replace(/&lt;/g, '<');
+  md = md.replace(/&gt;/g, '>');
+  return md.trim();
+}
+
 export function TiptapEditor() {
   const [showPanel, setShowPanel] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -62,9 +95,11 @@ export function TiptapEditor() {
   const [selectedFont, setSelectedFont] = useState(() => {
     return localStorage.getItem('textarea-font') || 'mono';
   });
-  const [showSource, setShowSource] = useState(false);
+  const [hoveredElement, setHoveredElement] = useState<{ text: string; markdown: string } | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCountRef = useRef(0);
+  const editorRef = useRef<HTMLDivElement>(null);
 
   // Save font preference
   const handleSelectFont = useCallback((fontId: string) => {
@@ -301,6 +336,33 @@ export function TiptapEditor() {
     }
   }, [activeNote?.content]);
 
+  // Handle hover on headings to show markdown source
+  const handleEditorMouseOver = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const tagName = target.tagName.toLowerCase();
+    
+    // Check if hovering over heading, strong, em, code, li
+    if (['h1', 'h2', 'h3', 'strong', 'em', 'code', 'li', 'b', 'i'].includes(tagName)) {
+      const outerHTML = target.outerHTML;
+      const markdown = htmlToMarkdownPreview(outerHTML);
+      
+      if (markdown) {
+        const rect = target.getBoundingClientRect();
+        setHoveredElement({ text: target.textContent || '', markdown });
+        setTooltipPos({ x: rect.left, y: rect.top - 8 });
+      }
+    }
+  }, []);
+
+  const handleEditorMouseOut = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const tagName = target.tagName.toLowerCase();
+    
+    if (['h1', 'h2', 'h3', 'strong', 'em', 'code', 'li', 'b', 'i'].includes(tagName)) {
+      setHoveredElement(null);
+    }
+  }, []);
+
   if (isLoading) {
     return <div className="min-h-svh bg-black" />;
   }
@@ -347,36 +409,35 @@ export function TiptapEditor() {
         className="hidden"
       />
 
-      {/* Editor or Source View */}
+      {/* Markdown source tooltip */}
+      {hoveredElement && (
+        <div 
+          className="fixed z-50 px-3 py-1.5 bg-neutral-800 border border-neutral-700 rounded-md text-xs font-mono text-emerald-400 shadow-lg pointer-events-none transform -translate-y-full"
+          style={{ 
+            left: tooltipPos.x, 
+            top: tooltipPos.y,
+            maxWidth: '300px'
+          }}
+        >
+          {hoveredElement.markdown}
+        </div>
+      )}
+
+      {/* Editor */}
       <main className="flex-1">
         <article 
           className="w-full px-4 sm:px-6 pt-6 sm:pt-8 pb-24"
           style={{ fontFamily: FONTS[selectedFont] }}
+          ref={editorRef}
+          onMouseOver={handleEditorMouseOver}
+          onMouseOut={handleEditorMouseOut}
         >
-          {showSource ? (
-            <pre className="whitespace-pre-wrap break-words text-sm text-neutral-300 font-mono leading-relaxed">
-              {activeNote?.content || ''}
-            </pre>
-          ) : (
-            <EditorContent editor={editor} />
-          )}
+          <EditorContent editor={editor} />
         </article>
       </main>
 
-      {/* Bottom buttons */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10 flex items-center gap-3">
-        <button
-          onClick={() => setShowSource(!showSource)}
-          className={`p-3 border rounded-full transition-all duration-200 ${
-            showSource 
-              ? 'bg-neutral-700 border-neutral-600 text-neutral-200' 
-              : 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-400 hover:text-neutral-200'
-          }`}
-          aria-label={showSource ? "View rendered" : "View source"}
-          title={showSource ? "Lihat hasil" : "Lihat source HTML"}
-        >
-          {showSource ? <Eye className="w-5 h-5" strokeWidth={1.5} /> : <Code className="w-5 h-5" strokeWidth={1.5} />}
-        </button>
+      {/* Bottom button - Menu */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10">
         <button
           onClick={() => setShowPanel(true)}
           className="p-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-full text-neutral-400 hover:text-neutral-200 transition-all duration-200"

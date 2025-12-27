@@ -154,9 +154,24 @@ export function TiptapEditor() {
   const [selectedFont, setSelectedFont] = useState(() => {
     return localStorage.getItem('textarea-font') || 'mono';
   });
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('textarea-theme');
+    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCountRef = useRef(0);
   const editorRef = useRef<any>(null);
+
+  // Apply theme to HTML element
+  useEffect(() => {
+    document.documentElement.classList.remove('dark', 'light');
+    document.documentElement.classList.add(theme);
+    localStorage.setItem('textarea-theme', theme);
+  }, [theme]);
+
+  const handleToggleTheme = useCallback(() => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  }, []);
 
   // Save font preference
   const handleSelectFont = useCallback((fontId: string) => {
@@ -246,7 +261,19 @@ export function TiptapEditor() {
     URL.revokeObjectURL(url);
   }, [activeNote]);
 
-  // Keyboard shortcuts
+  // Import Markdown
+  const handleImportMarkdown = useCallback((content: string, filename: string) => {
+    const html = markdownToHtml(content);
+    const newNote = createNote();
+    newNote.content = html;
+    
+    setNotes(prev => {
+      const updated = [newNote, ...prev];
+      saveNotes(updated);
+      return updated;
+    });
+    setActiveNoteId(newNote.id);
+  }, []);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
@@ -466,12 +493,12 @@ export function TiptapEditor() {
   }, [activeNote?.content]);
 
   if (isLoading) {
-    return <div className="min-h-svh bg-black" />;
+    return <div className={`min-h-svh ${theme === 'dark' ? 'bg-black' : 'bg-neutral-50'}`} />;
   }
 
   return (
     <div 
-      className="min-h-svh bg-black flex flex-col relative"
+      className={`min-h-svh flex flex-col relative ${theme === 'dark' ? 'bg-black' : 'bg-neutral-50'}`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -479,8 +506,8 @@ export function TiptapEditor() {
     >
       {/* Drag overlay */}
       {isDragging && (
-        <div className="fixed inset-0 z-40 bg-black/95 flex items-center justify-center pointer-events-none">
-          <div className="flex flex-col items-center gap-2 text-neutral-500">
+        <div className={`fixed inset-0 z-40 flex items-center justify-center pointer-events-none ${theme === 'dark' ? 'bg-black/95' : 'bg-white/95'}`}>
+          <div className={`flex flex-col items-center gap-2 ${theme === 'dark' ? 'text-neutral-500' : 'text-neutral-400'}`}>
             <ImagePlus className="w-8 h-8" strokeWidth={1.5} />
             <span className="text-sm font-mono">Drop image</span>
           </div>
@@ -493,11 +520,14 @@ export function TiptapEditor() {
           notes={notes}
           activeNoteId={activeNoteId}
           selectedFont={selectedFont}
+          theme={theme}
           onSelectNote={setActiveNoteId}
           onCreateNote={handleCreateNote}
           onDeleteNote={handleDeleteNote}
           onSelectFont={handleSelectFont}
           onExportMarkdown={handleExportMarkdown}
+          onImportMarkdown={handleImportMarkdown}
+          onToggleTheme={handleToggleTheme}
           onClose={() => setShowPanel(false)}
         />
       )}
@@ -526,7 +556,11 @@ export function TiptapEditor() {
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10">
         <button
           onClick={() => setShowPanel(true)}
-          className="p-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-full text-neutral-400 hover:text-neutral-200 transition-all duration-200"
+          className={`p-3 border rounded-full transition-all duration-200 ${
+            theme === 'dark' 
+              ? 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-400 hover:text-neutral-200' 
+              : 'bg-white hover:bg-neutral-100 border-neutral-200 text-neutral-500 hover:text-neutral-700 shadow-sm'
+          }`}
           aria-label="Menu"
         >
           <Menu className="w-5 h-5" strokeWidth={1.5} />

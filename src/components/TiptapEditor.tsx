@@ -5,7 +5,7 @@ import Typography from '@tiptap/extension-typography';
 import CharacterCount from '@tiptap/extension-character-count';
 import Image from '@tiptap/extension-image';
 import Dropcursor from '@tiptap/extension-dropcursor';
-import { Download, ImagePlus } from 'lucide-react';
+import { ListFilter, ImagePlus } from 'lucide-react';
 import { useEffect, useState, useCallback, useRef } from 'react';
 
 // Compression utilities
@@ -48,38 +48,24 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number) {
   };
 }
 
-// Convert file to base64
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = error => reject(error);
-  });
-}
-
-// Compress image to reduce size
+// Compress image
 async function compressImage(file: File, maxWidth = 1200, quality = 0.8): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new window.Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
       let { width, height } = img;
-      
       if (width > maxWidth) {
         height = (height * maxWidth) / width;
         width = maxWidth;
       }
-      
       canvas.width = width;
       canvas.height = height;
-      
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         reject(new Error('Could not get canvas context'));
         return;
       }
-      
       ctx.drawImage(img, 0, 0, width, height);
       resolve(canvas.toDataURL('image/jpeg', quality));
     };
@@ -89,14 +75,14 @@ async function compressImage(file: File, maxWidth = 1200, quality = 0.8): Promis
 }
 
 export function TiptapEditor() {
-  const [showStats, setShowStats] = useState(true);
+  const [showMenu, setShowMenu] = useState(false);
   const [initialContent, setInitialContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCountRef = useRef(0);
 
-  // Load content from URL hash or localStorage
+  // Load content
   useEffect(() => {
     const loadContent = async () => {
       try {
@@ -139,13 +125,11 @@ export function TiptapEditor() {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3],
-        },
+        heading: { levels: [1, 2, 3] },
         dropcursor: false,
       }),
       Placeholder.configure({
-        placeholder: 'Write something...',
+        placeholder: '',
         emptyEditorClass: 'is-editor-empty',
       }),
       Typography,
@@ -153,25 +137,22 @@ export function TiptapEditor() {
       Image.configure({
         inline: false,
         allowBase64: true,
-        HTMLAttributes: {
-          class: 'editor-image',
-        },
+        HTMLAttributes: { class: 'editor-image' },
       }),
       Dropcursor.configure({
-        color: 'hsl(28 65% 42%)',
-        width: 2,
+        color: '#ffffff',
+        width: 1,
       }),
     ],
     content: '',
     editorProps: {
       attributes: {
-        class: 'tiptap-editor focus:outline-none min-h-[calc(100svh-6rem)]',
+        class: 'tiptap-editor focus:outline-none min-h-[calc(100svh-3rem)]',
       },
-      handleDrop: (view, event, slice, moved) => {
+      handleDrop: (view, event, _slice, moved) => {
         if (!moved && event.dataTransfer?.files.length) {
           const files = Array.from(event.dataTransfer.files);
           const images = files.filter(file => file.type.startsWith('image/'));
-          
           if (images.length > 0) {
             event.preventDefault();
             images.forEach(async (file) => {
@@ -194,7 +175,6 @@ export function TiptapEditor() {
       handlePaste: (view, event) => {
         const items = Array.from(event.clipboardData?.items ?? []);
         const images = items.filter(item => item.type.startsWith('image/'));
-        
         if (images.length > 0) {
           event.preventDefault();
           images.forEach(async (item) => {
@@ -219,22 +199,20 @@ export function TiptapEditor() {
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
       debouncedSave(html);
-      setShowStats(true);
     },
   }, [initialContent]);
 
-  // Update editor content when initialContent loads
+  // Set initial content
   useEffect(() => {
     if (editor && initialContent !== null && initialContent !== '') {
       editor.commands.setContent(initialContent);
     }
   }, [editor, initialContent]);
 
-  // Handle file input change
+  // Handle file input
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !editor) return;
-    
     for (const file of Array.from(files)) {
       if (file.type.startsWith('image/')) {
         try {
@@ -245,30 +223,22 @@ export function TiptapEditor() {
         }
       }
     }
-    
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Drag and drop handlers for the container
+  // Drag handlers
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragCountRef.current++;
-    if (e.dataTransfer?.types.includes('Files')) {
-      setIsDragging(true);
-    }
+    if (e.dataTransfer?.types.includes('Files')) setIsDragging(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragCountRef.current--;
-    if (dragCountRef.current === 0) {
-      setIsDragging(false);
-    }
+    if (dragCountRef.current === 0) setIsDragging(false);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -281,12 +251,9 @@ export function TiptapEditor() {
     e.stopPropagation();
     dragCountRef.current = 0;
     setIsDragging(false);
-    
     if (!editor) return;
-    
     const files = Array.from(e.dataTransfer?.files ?? []);
     const images = files.filter(file => file.type.startsWith('image/'));
-    
     for (const file of images) {
       try {
         const base64 = await compressImage(file);
@@ -297,15 +264,7 @@ export function TiptapEditor() {
     }
   };
 
-  // Auto-hide stats
-  useEffect(() => {
-    if (showStats) {
-      const timer = setTimeout(() => setShowStats(false), 2500);
-      return () => clearTimeout(timer);
-    }
-  }, [showStats, editor?.storage.characterCount]);
-
-  // Keyboard shortcut for download
+  // Keyboard shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -317,22 +276,19 @@ export function TiptapEditor() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [editor]);
 
-  // Update document title
+  // Update title
   useEffect(() => {
     if (editor) {
       const text = editor.getText();
-      const match = text.match(/^#(.+)/);
-      document.title = match?.[1]?.trim() ?? 'Textarea';
+      const match = text.match(/^(.+)/);
+      document.title = match?.[1]?.trim().slice(0, 50) || 'Textarea';
     }
   }, [editor?.storage.characterCount]);
 
   const downloadAsHtml = useCallback(() => {
     if (!editor) return;
-    
     const text = editor.getText();
-    const match = text.match(/^#(.+)/);
-    const title = match?.[1]?.trim() ?? 'Textarea';
-    
+    const title = text.split('\n')[0]?.trim().slice(0, 50) || 'Textarea';
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -340,39 +296,20 @@ export function TiptapEditor() {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title}</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html { 
-      color-scheme: light dark;
-      background: #f9f7f5;
-      color: #1f1d1a;
-    }
-    @media (prefers-color-scheme: dark) {
-      html { background: #141210; color: #e5e2de; }
-    }
-    article {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: 48px 24px;
-      font: 20px/1.8 Georgia, serif;
-    }
-    h1, h2, h3 { margin: 1.5em 0 0.5em; font-weight: 600; }
-    h1 { font-size: 2em; }
-    h2 { font-size: 1.5em; }
-    h3 { font-size: 1.25em; }
-    p { margin: 0.75em 0; }
-    strong { font-weight: 600; }
-    em { font-style: italic; }
-    code { font-family: monospace; background: rgba(0,0,0,0.05); padding: 0.2em 0.4em; border-radius: 3px; }
-    blockquote { border-left: 3px solid rgba(0,0,0,0.2); padding-left: 1em; margin: 1em 0; font-style: italic; }
-    ul, ol { margin: 0.75em 0; padding-left: 1.5em; }
-    img { max-width: 100%; height: auto; border-radius: 8px; margin: 1em 0; }
+    *{margin:0;padding:0;box-sizing:border-box}
+    html{background:#000;color:#f2f2f2}
+    article{max-width:680px;margin:0 auto;padding:48px 24px;font:17px/1.7 'IBM Plex Mono',monospace}
+    h1,h2,h3{margin:1.5em 0 .5em;font-weight:600}
+    h1{font-size:1.75em}h2{font-size:1.375em}h3{font-size:1.125em}
+    p{margin:.75em 0}strong{font-weight:600}em{font-style:italic}
+    code{font-family:inherit;background:#1a1a1a;padding:.15em .35em;border-radius:3px}
+    blockquote{border-left:2px solid #333;padding-left:1em;margin:1em 0;font-style:italic;color:#888}
+    ul,ol{margin:.75em 0;padding-left:1.25em}
+    img{max-width:100%;height:auto;border-radius:4px;margin:1em 0}
   </style>
 </head>
-<body>
-  <article>${editor.getHTML()}</article>
-</body>
+<body><article>${editor.getHTML()}</article></body>
 </html>`;
-
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -386,18 +323,12 @@ export function TiptapEditor() {
   const charCount = editor?.storage.characterCount?.characters() ?? 0;
 
   if (isLoading || initialContent === null) {
-    return (
-      <div className="min-h-svh flex items-center justify-center bg-background">
-        <div className="text-muted-foreground/50 animate-pulse text-sm">...</div>
-      </div>
-    );
+    return <div className="min-h-svh bg-background" />;
   }
 
   return (
     <div 
       className="min-h-svh bg-background flex flex-col relative"
-      onMouseMove={() => setShowStats(true)}
-      onTouchStart={() => setShowStats(true)}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -405,10 +336,10 @@ export function TiptapEditor() {
     >
       {/* Drag overlay */}
       {isDragging && (
-        <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center pointer-events-none">
-          <div className="flex flex-col items-center gap-3 text-primary animate-pulse">
-            <ImagePlus className="w-12 h-12" />
-            <span className="text-lg font-medium">Drop image here</span>
+        <div className="fixed inset-0 z-50 bg-background/95 flex items-center justify-center pointer-events-none">
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <ImagePlus className="w-8 h-8" strokeWidth={1.5} />
+            <span className="text-sm">Drop image</span>
           </div>
         </div>
       )}
@@ -425,49 +356,60 @@ export function TiptapEditor() {
 
       {/* Editor */}
       <main className="flex-1">
-        <article className="w-full max-w-2xl mx-auto px-4 sm:px-6 md:px-8 pt-4 sm:pt-6 pb-20">
+        <article className="w-full max-w-2xl mx-auto px-5 sm:px-8 pt-12 sm:pt-16 pb-24">
           <EditorContent editor={editor} />
         </article>
       </main>
 
-      {/* Floating Stats */}
-      <div 
-        className={`fixed bottom-0 left-0 right-0 z-10 transition-all duration-300 ease-out ${
-          showStats 
-            ? 'opacity-100 translate-y-0' 
-            : 'opacity-0 translate-y-1 pointer-events-none'
-        }`}
-      >
-        <div className="bg-gradient-to-t from-background via-background/95 to-transparent pt-6 pb-3">
-          <div className="max-w-2xl mx-auto px-4 sm:px-6 md:px-8 flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-muted-foreground/60 font-mono tracking-wider">
-              <span>{wordCount} words</span>
-              <span className="text-border/40">·</span>
-              <span>{charCount} chars</span>
+      {/* Bottom menu button */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-10">
+        <button
+          onClick={() => setShowMenu(!showMenu)}
+          className="p-2 text-muted-foreground/40 hover:text-foreground transition-colors duration-200"
+          aria-label="Menu"
+        >
+          <ListFilter className="w-4 h-4" strokeWidth={1.5} />
+        </button>
+      </div>
+
+      {/* Menu popup */}
+      {showMenu && (
+        <>
+          <div 
+            className="fixed inset-0 z-20" 
+            onClick={() => setShowMenu(false)} 
+          />
+          <div className="fixed bottom-14 left-1/2 -translate-x-1/2 z-30 bg-card border border-border rounded-lg shadow-lg p-3 min-w-[160px]">
+            <div className="text-xs text-muted-foreground font-mono mb-3 px-1">
+              {wordCount} words · {charCount} chars
             </div>
-            
-            <div className="flex items-center gap-1">
+            <div className="space-y-1">
               <button
-                onClick={() => fileInputRef.current?.click()}
-                className="p-2 -m-1 text-muted-foreground/40 hover:text-foreground active:scale-95 rounded-full transition-all duration-200"
-                title="Add image"
-                aria-label="Add image"
+                onClick={() => {
+                  fileInputRef.current?.click();
+                  setShowMenu(false);
+                }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-foreground/80 hover:bg-accent rounded transition-colors"
               >
-                <ImagePlus className="w-4 h-4" />
+                <ImagePlus className="w-3.5 h-3.5" strokeWidth={1.5} />
+                Add image
               </button>
-              
               <button
-                onClick={downloadAsHtml}
-                className="p-2 -m-1 text-muted-foreground/40 hover:text-foreground active:scale-95 rounded-full transition-all duration-200"
-                title="Save as HTML (⌘S)"
-                aria-label="Download as HTML"
+                onClick={() => {
+                  downloadAsHtml();
+                  setShowMenu(false);
+                }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-foreground/80 hover:bg-accent rounded transition-colors"
               >
-                <Download className="w-4 h-4" />
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                Save HTML
               </button>
             </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }
